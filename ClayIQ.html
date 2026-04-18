@@ -277,7 +277,7 @@
     const base64 = src.split(',')[1];
     const mime = src.split(';')[0].split(':')[1];
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://clayiq.vercel.app/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -378,7 +378,7 @@
     document.getElementById('errorMsg').classList.remove('visible');
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://clayiq.vercel.app/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
