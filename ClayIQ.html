@@ -262,7 +262,7 @@
             role:'user',
             content:[
               {type:'image',source:{type:'base64',media_type:mime,data:base64}},
-              {type:'text',text:'This is a sporting clays scorecard. Read every station score carefully. Return ONLY valid JSON with no markdown and no explanation:\n{"stations":[{"station":1,"hit":4,"total":5}],"total_hit":75,"total_birds":100}\nIf you cannot read a value use null. If not a scorecard return {"error":"not a scorecard"}'}
+              {type:'text',text:'This is a sporting clays scorecard. Read every station score carefully. Also look for any T or R written next to each station indicating True pairs or Report pairs.\n\nReturn ONLY valid JSON with no markdown and no explanation:\n{"stations":[{"station":1,"hit":4,"total":5,"pairs":"true"},{"station":2,"hit":3,"total":5,"pairs":"report"},{"station":3,"hit":4,"total":5,"pairs":null}],"total_hit":75,"total_birds":100}\n\nRules:\n- pairs = "true" if T or True is written, "report" if R or Report is written, null if nothing is written\n- If not a scorecard return {"error":"not a scorecard"}'}
             ]
           }]
         })
@@ -283,7 +283,7 @@
       if(parsed.error) throw new Error(parsed.error);
       if(!parsed.stations||!parsed.stations.length) throw new Error('No stations found in response');
 
-      stations=parsed.stations.map(s=>({station:s.station,hit:s.hit,total:s.total||5,pairs:null}));
+      stations=parsed.stations.map(s=>({station:s.station,hit:s.hit,total:s.total||5,pairs:s.pairs||null}));
       buildList();
       buildStartStations();
       updateTotal();
@@ -311,13 +311,16 @@
       const row=document.createElement('div');
       row.className='station-tag-row';
       row.id='row'+i;
+      const rCls=s.pairs==='report'?' sel-report':'';
+      const tCls=s.pairs==='true'?' sel-true':'';
+      if(s.pairs) row.classList.add('tagged');
       row.innerHTML=`
         <span class="stn-num">S${s.station}</span>
         <input class="stn-score-input" type="number" min="0" max="${s.total}" value="${s.hit!==null?s.hit:''}" placeholder="—" oninput="editScore(${i},this.value)">
         <span class="stn-birds" id="b${i}">${s.hit!==null?s.hit+'/'+s.total:'?/'+s.total}</span>
         <div class="pairs-toggle">
-          <button class="pairs-btn" onclick="setPairs(${i},'report',this)">R</button>
-          <button class="pairs-btn" onclick="setPairs(${i},'true',this)">T</button>
+          <button class="pairs-btn${rCls}" onclick="setPairs(${i},'report',this)">R</button>
+          <button class="pairs-btn${tCls}" onclick="setPairs(${i},'true',this)">T</button>
         </div>
         <div class="weak-dot ${weak?'on':''}" id="w${i}"></div>`;
       list.appendChild(row);
