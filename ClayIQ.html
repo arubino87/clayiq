@@ -206,13 +206,33 @@
     const file=input.files[0]; if(!file) return;
     const reader=new FileReader();
     reader.onload=e=>{
-      imgSrc=e.target.result;
-      document.getElementById('prevImg2').src=imgSrc;
-      document.getElementById('prevImg3').src=imgSrc;
-      goTo(2);
-      readCard(imgSrc);
+      const original=e.target.result;
+      compressImage(original, 1200, 0.82, function(compressed){
+        imgSrc=compressed;
+        document.getElementById('prevImg2').src=compressed;
+        document.getElementById('prevImg3').src=compressed;
+        goTo(2);
+        readCard(compressed);
+      });
     };
     reader.readAsDataURL(file);
+  }
+
+  function compressImage(dataUrl, maxDim, quality, callback){
+    const img=new Image();
+    img.onload=function(){
+      let w=img.width, h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){ h=Math.round(h*(maxDim/w)); w=maxDim; }
+        else{ w=Math.round(w*(maxDim/h)); h=maxDim; }
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src=dataUrl;
   }
 
   async function readCard(src){
