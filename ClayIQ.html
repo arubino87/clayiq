@@ -19,7 +19,7 @@
   .tagline{font-size:12px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--fog);}
   .steps{display:flex;align-items:center;padding:0 24px;margin-bottom:28px;}
   .step{display:flex;align-items:center;gap:8px;flex:1;}
-  .step-circle{width:28px;height:28px;border-radius:50%;background:var(--dust);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);flex-shrink:0;transition:all 0.3s;cursor:default;}
+  .step-circle{width:28px;height:28px;border-radius:50%;background:var(--dust);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);flex-shrink:0;transition:all 0.3s;cursor:default;padding:0;line-height:1;}
   .step-circle.active{background:var(--clay);border-color:var(--clay);color:var(--white);}
   .step-circle.done{background:var(--success);border-color:var(--success);color:var(--white);cursor:pointer;}
   .step-circle.done:hover{opacity:0.8;}
@@ -117,13 +117,13 @@
   </header>
 
   <div class="steps">
-    <div class="step"><div class="step-circle active" id="s1">1</div><span class="step-name active" id="sn1">Upload</span></div>
+    <div class="step"><button class="step-circle active" id="s1" onclick="canNavigate(1)&&goTo(1)">1</button><span class="step-name active" id="sn1">Upload</span></div>
     <div class="step-line"></div>
-    <div class="step"><div class="step-circle" id="s2">2</div><span class="step-name" id="sn2">Review</span></div>
+    <div class="step"><button class="step-circle" id="s2" onclick="canNavigate(2)&&goTo(2)">2</button><span class="step-name" id="sn2">Review</span></div>
     <div class="step-line"></div>
-    <div class="step"><div class="step-circle" id="s3">3</div><span class="step-name" id="sn3">Details</span></div>
+    <div class="step"><button class="step-circle" id="s3" onclick="canNavigate(3)&&goTo(3)">3</button><span class="step-name" id="sn3">Details</span></div>
     <div class="step-line"></div>
-    <div class="step"><div class="step-circle" id="s4">4</div><span class="step-name" id="sn4">Coaching</span></div>
+    <div class="step"><button class="step-circle" id="s4" onclick="canNavigate(4)&&goTo(4)">4</button><span class="step-name" id="sn4">Coaching</span></div>
   </div>
 
   <!-- SCREEN 1: UPLOAD -->
@@ -418,12 +418,9 @@ Sound like a coach who has seen everything. Not a chatbot.`
       const c=document.getElementById('s'+i),nm=document.getElementById('sn'+i);
       c.classList.remove('active','done');
       if(nm) nm.classList.remove('active');
-      if(i<n){
-        c.classList.add('done');c.textContent='✓';
-        const step=i; c.onclick=()=>canNavigate(step)&&goTo(step);
-      }
-      else if(i===n){c.classList.add('active');c.textContent=i;if(nm)nm.classList.add('active');c.onclick=null;}
-      else{c.textContent=i;c.onclick=null;}
+      if(i<n){c.classList.add('done');c.textContent='✓';}
+      else if(i===n){c.classList.add('active');c.textContent=i;if(nm)nm.classList.add('active');}
+      else{c.textContent=i;}
     }
     window.scrollTo({top:0,behavior:'smooth'});
   }
