@@ -1,6 +1,6 @@
 <!--
   ClayIQ
-  Version: 1.5.1
+  Version: 1.5.2
   Updated: 2026-04-20
 
   Changelog:
@@ -15,10 +15,11 @@
   v1.4.2 - Added orange dot legend explanation
   v1.4.3 - Added starting station selector — affects coaching analysis
   v1.4.4 - Added automatic T/R pair type reading from scorecard notation
-  v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
   v1.5.0 - Full clean rebuild to resolve upload not triggering on mobile/Edge
            Upload zone now uses direct click handler for cross-browser reliability
            File input hidden and triggered programmatically
+  v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
+  v1.5.2 - Scorecard read uses claude-haiku-4-5-20251001 (300 tokens); coaching uses claude-sonnet-4-6 (600 tokens)
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -301,8 +302,8 @@ async function readCard(src) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
         messages: [{
           role: 'user',
           content: [
@@ -429,7 +430,7 @@ async function getCoaching() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
+        max_tokens: 600,
         messages: [{
           role: 'user',
           content: 'You are ClayIQ — an expert sporting clays performance coach who combines technical shot analysis with A.I.M. (Attention, Intention, Management) mental game principles by Anthony Matarese. Coach with direct, encouraging, analogy-driven feedback under 300 words.\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nRespond with exactly three sections using bold headers:\n\n**Round Read** — One honest sentence. Direct, not sugarcoated.\n\n**Focus For Next Session** — The single highest-leverage fix, with one specific drill tailored to their weak stations and pair types.\n\n**A.I.M. Mental Cue** — One specific cue referencing Attention, Intention, or Management based on their mental game data.\n\nSound like a coach who has seen everything. Not a chatbot.'
