@@ -1,1 +1,495 @@
+<!--
+  ClayIQ
+  Version: 1.7.0
+  Updated: 2026-04-21
 
+  Changelog:
+  v1.0.0 - Initial build: score slider, station selection, mental game, AI coaching
+  v1.1.0 - Replaced slider with scorecard photo upload and AI vision score reading
+  v1.2.0 - Added report/true pairs tagging per station
+  v1.3.0 - Added Vercel backend to resolve CORS issue with Anthropic API
+  v1.3.1 - Updated model ID to claude-sonnet-4-6
+  v1.3.2 - Added auto image compression to fix Request Entity Too Large error
+  v1.4.0 - Added navigation buttons and clickable step indicators
+  v1.4.1 - Fixed step 2 (Review) triggering scorecard re-read instead of showing review screen
+  v1.4.2 - Added orange dot legend explanation
+  v1.4.3 - Added starting station selector — affects coaching analysis
+  v1.4.4 - Added automatic T/R pair type reading from scorecard notation
+  v1.5.0 - Full clean rebuild to resolve upload not triggering on mobile/Edge
+           Upload zone now uses direct click handler for cross-browser reliability
+           File input hidden and triggered programmatically
+  v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
+  v1.6.0 - Removed all A.I.M. and Anthony Matarese references from coaching prompt
+           Replaced A.I.M. Mental Cue section with Next Round Mindset
+  v1.7.0 - Upgraded coaching prompt with pattern detection, root-cause diagnosis,
+           single-issue prioritization, structured drill instructions, and
+           deterministic mental cue guidance
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClayIQ</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--clay:#C4531A;--clay-dark:#8B3A10;--clay-light:#F2784B;--smoke:#1A1A18;--ash:#2C2C28;--dust:#3D3D38;--fog:#8A8A82;--paper:#F5F2EC;--cream:#EDE9E0;--white:#FAFAF7;--success:#4A9E6B;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--smoke);color:var(--paper);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(196,83,26,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 90%,rgba(196,83,26,0.05) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 80px;}
+header{padding:48px 24px 32px;}
+.logo{display:flex;align-items:baseline;gap:6px;margin-bottom:6px;}
+.logo-text{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;color:var(--white);line-height:1;}
+.logo-iq{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;color:var(--clay);line-height:1;}
+.logo-dot{width:8px;height:8px;background:var(--clay);border-radius:50%;margin-bottom:6px;flex-shrink:0;}
+.tagline{font-size:12px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--fog);}
+.steps{display:flex;align-items:center;padding:0 24px;margin-bottom:28px;}
+.step{display:flex;align-items:center;gap:8px;flex:1;}
+.step-circle{width:28px;height:28px;border-radius:50%;background:var(--dust);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);flex-shrink:0;transition:all 0.3s;cursor:default;padding:0;line-height:1;}
+.step-circle.active{background:var(--clay);border-color:var(--clay);color:var(--white);}
+.step-circle.done{background:var(--success);border-color:var(--success);color:var(--white);cursor:pointer;}
+.step-circle.done:hover{opacity:0.8;}
+.step-name{font-size:11px;font-weight:500;color:var(--fog);letter-spacing:0.5px;transition:color 0.3s;}
+.step-name.active{color:var(--paper);}
+.step-line{flex:1;height:1px;background:rgba(255,255,255,0.08);margin:0 8px;}
+.nav-row{display:flex;justify-content:space-between;align-items:center;margin:12px 16px 0;gap:10px;}
+.nav-btn{flex:1;padding:11px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:var(--fog);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
+.nav-btn:hover{border-color:var(--clay);color:var(--clay-light);}
+.nav-btn.primary{background:var(--clay);border-color:var(--clay);color:var(--white);}
+.nav-btn.primary:hover{background:var(--clay-light);}
+.section-label{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--clay);padding:0 24px;margin-bottom:12px;}
+.card{margin:0 16px 16px;background:var(--ash);border-radius:16px;border:1px solid rgba(255,255,255,0.06);padding:20px;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(196,83,26,0.4),transparent);}
+.screen{display:none;}.screen.active{display:block;}
+.upload-zone{margin:0 16px 16px;border:2px dashed rgba(196,83,26,0.3);border-radius:16px;padding:40px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:rgba(196,83,26,0.03);position:relative;}
+.upload-zone:hover{border-color:var(--clay);background:rgba(196,83,26,0.08);}
+.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{width:56px;height:56px;background:rgba(196,83,26,0.12);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;}
+.upload-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--white);margin-bottom:6px;}
+.upload-sub{font-size:13px;color:var(--fog);line-height:1.5;}
+.preview-wrap{margin:0 16px 16px;border-radius:16px;overflow:hidden;border:1px solid rgba(196,83,26,0.2);position:relative;}
+.preview-wrap img{width:100%;display:block;max-height:240px;object-fit:cover;}
+.preview-badge{position:absolute;top:10px;right:10px;background:rgba(26,26,24,0.85);border:1px solid rgba(196,83,26,0.3);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--clay-light);letter-spacing:1px;backdrop-filter:blur(4px);}
+.reading-card{margin:0 16px 16px;background:var(--ash);border-radius:16px;border:1px solid rgba(196,83,26,0.2);padding:40px 20px;text-align:center;}
+.reading-dots{display:flex;justify-content:center;gap:6px;margin-bottom:20px;}
+.reading-dots span{width:10px;height:10px;background:var(--clay);border-radius:50%;animation:pulse 1.2s ease-in-out infinite;}
+.reading-dots span:nth-child(2){animation-delay:0.2s;}.reading-dots span:nth-child(3){animation-delay:0.4s;}
+@keyframes pulse{0%,80%,100%{opacity:0.3;transform:scale(0.8);}40%{opacity:1;transform:scale(1);}}
+.reading-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--white);margin-bottom:8px;}
+.reading-sub{font-size:13px;color:var(--fog);}
+.debug-msg{margin:0 16px 16px;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--fog);line-height:1.6;font-family:'DM Mono',monospace;word-break:break-all;display:none;}
+.debug-msg.visible{display:block;}
+.score-summary{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.total-score{font-family:'Bebas Neue',sans-serif;font-size:56px;color:var(--white);line-height:1;letter-spacing:2px;}
+.total-label{font-size:12px;color:var(--fog);margin-top:4px;}
+.station-tag-list{display:flex;flex-direction:column;gap:8px;}
+.station-tag-row{display:flex;align-items:center;gap:10px;background:var(--dust);border-radius:12px;padding:10px 14px;border:1px solid rgba(255,255,255,0.05);transition:border-color 0.15s;}
+.station-tag-row.tagged{border-color:rgba(196,83,26,0.2);}
+.stn-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--fog);width:24px;flex-shrink:0;}
+.stn-score-input{background:transparent;border:none;border-bottom:1px solid rgba(196,83,26,0.4);color:var(--white);width:40px;text-align:center;outline:none;font-family:'DM Mono',monospace;font-size:18px;font-weight:500;padding:0 2px;}
+.stn-birds{font-size:11px;color:var(--fog);flex:1;}
+.pairs-toggle{display:flex;gap:4px;flex-shrink:0;}
+.pairs-btn{padding:5px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:var(--fog);font-size:11px;font-weight:600;letter-spacing:0.5px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.pairs-btn:hover{border-color:rgba(196,83,26,0.4);color:var(--paper);}
+.pairs-btn.sel-report{background:rgba(196,83,26,0.2);border-color:var(--clay);color:var(--clay-light);}
+.pairs-btn.sel-true{background:rgba(74,158,107,0.2);border-color:var(--success);color:#6FCF97;}
+.weak-dot{width:6px;height:6px;border-radius:50%;background:var(--clay);flex-shrink:0;opacity:0;transition:opacity 0.2s;}
+.weak-dot.on{opacity:1;}
+.select-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.select-group label{display:block;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--fog);margin-bottom:8px;}
+.start-station-btn{width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:var(--fog);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;}
+.start-station-btn:hover{border-color:rgba(196,83,26,0.4);color:var(--paper);}
+.start-station-btn.active{background:var(--clay);border-color:var(--clay);color:var(--white);}
+select{width:100%;background:var(--dust);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:var(--paper);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;padding:10px 12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A8A82' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+select:focus{border-color:var(--clay);}
+.mental-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.mental-btn{background:var(--dust);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 8px;cursor:pointer;transition:all 0.15s;text-align:center;}
+.mental-btn:hover{border-color:rgba(196,83,26,0.3);}
+.mental-btn.selected{border-color:var(--clay);background:rgba(196,83,26,0.15);}
+.mental-emoji{font-size:20px;display:block;margin-bottom:4px;}
+.mental-label{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--fog);}
+.divider{height:1px;background:rgba(255,255,255,0.05);margin:4px 16px 16px;}
+.cta-btn{display:block;width:calc(100% - 32px);margin:8px 16px 0;padding:18px;background:var(--clay);color:var(--white);border:none;border-radius:14px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+.cta-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1) 0%,transparent 50%);}
+.cta-btn:hover{background:var(--clay-light);transform:translateY(-1px);box-shadow:0 8px 24px rgba(196,83,26,0.35);}
+.cta-btn:disabled{background:var(--dust);color:var(--fog);cursor:not-allowed;transform:none;box-shadow:none;}
+.coaching-card{margin:0 16px 16px;background:var(--ash);border-radius:16px;border:1px solid rgba(196,83,26,0.25);padding:24px 20px;position:relative;overflow:hidden;animation:slideUp 0.4s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+.coaching-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--clay-dark),var(--clay),var(--clay-light));}
+.coaching-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.coaching-icon{width:36px;height:36px;background:rgba(196,83,26,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.coaching-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--white);}
+.coaching-subtitle{font-size:11px;color:var(--fog);margin-top:1px;}
+.score-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;}
+.chip{padding:4px 12px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:0.5px;}
+.chip-score{background:rgba(196,83,26,0.15);color:var(--clay-light);border:1px solid rgba(196,83,26,0.3);}
+.chip-weak{background:rgba(196,83,26,0.1);color:var(--fog);border:1px solid rgba(255,255,255,0.08);}
+.chip-mental{background:rgba(74,158,107,0.1);color:#6FCF97;border:1px solid rgba(74,158,107,0.2);}
+.coaching-body{font-size:15px;line-height:1.75;color:var(--cream);white-space:pre-wrap;}
+.coaching-body strong{color:var(--white);font-weight:600;}
+.error-msg{margin:10px 16px 0;background:rgba(196,83,26,0.1);border:1px solid rgba(196,83,26,0.3);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--clay-light);display:none;}
+.error-msg.visible{display:block;}
+.info-note{margin:-4px 16px 16px;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(255,255,255,0.06);font-size:12px;color:var(--fog);line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <span class="logo-text">CLAY</span>
+      <div class="logo-dot"></div>
+      <span class="logo-iq">IQ</span>
+    </div>
+    <p class="tagline">Score · Analyze · Improve</p>
+  </header>
+
+  <div class="steps">
+    <div class="step"><button class="step-circle active" id="s1" onclick="canNav(1)&&goTo(1)">1</button><span class="step-name active" id="sn1">Upload</span></div>
+    <div class="step-line"></div>
+    <div class="step"><button class="step-circle" id="s2" onclick="canNav(2)&&goTo(3)">2</button><span class="step-name" id="sn2">Review</span></div>
+    <div class="step-line"></div>
+    <div class="step"><button class="step-circle" id="s3" onclick="canNav(3)&&goTo(3)">3</button><span class="step-name" id="sn3">Details</span></div>
+    <div class="step-line"></div>
+    <div class="step"><button class="step-circle" id="s4" onclick="canNav(4)&&goTo(4)">4</button><span class="step-name" id="sn4">Coaching</span></div>
+  </div>
+
+  <!-- SCREEN 1: UPLOAD -->
+  <div class="screen active" id="screen1">
+    <p class="section-label">Scorecard</p>
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" accept="image/*" id="fileInput" onchange="handleFile(this)" style="display:none;">
+      <div class="upload-icon">📸</div>
+      <div class="upload-title">Upload Scorecard</div>
+      <p class="upload-sub">Choose from your photo library or take a photo.<br>ClayIQ reads your scores automatically.</p>
+    </div>
+    <div class="info-note">Works best with a clear, well-lit photo. You can correct any misread scores in the next step.</div>
+  </div>
+
+  <!-- SCREEN 2: READING -->
+  <div class="screen" id="screen2">
+    <div class="preview-wrap" id="prevWrap2"><img id="prevImg2" src="" alt="Scorecard"><div class="preview-badge">Reading scores...</div></div>
+    <div class="reading-card">
+      <div class="reading-dots"><span></span><span></span><span></span></div>
+      <div class="reading-title">Reading Your Scorecard</div>
+      <p class="reading-sub">AI is analyzing your card — about 10 seconds</p>
+    </div>
+    <div class="debug-msg" id="debugMsg"></div>
+  </div>
+
+  <!-- SCREEN 3: REVIEW + DETAILS -->
+  <div class="screen" id="screen3">
+    <div class="preview-wrap" id="prevWrap3" style="margin-bottom:16px;"><img id="prevImg3" src="" alt="Scorecard"><div class="preview-badge" id="prevBadge3">Scores read</div></div>
+
+    <p class="section-label">Station Scores & Pair Type</p>
+    <div class="card">
+      <div class="score-summary">
+        <div><div class="total-score" id="totalDisplay">—</div><div class="total-label">Total birds hit</div></div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--fog);margin-bottom:4px;">Tag each station</div>
+          <div style="font-size:11px;color:var(--fog);"><span style="color:var(--clay-light);">R</span> = Report &nbsp;<span style="color:#6FCF97;">T</span> = True pairs</div>
+        </div>
+      </div>
+      <div class="station-tag-list" id="stationList"></div>
+    </div>
+    <div class="info-note" style="margin-top:-8px;">Tap a score to edit if AI misread it. &nbsp;<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--clay);vertical-align:middle;margin-right:3px;"></span> = dropped more than 1 bird. If T or R was written on your card it is pre-selected.</div>
+
+    <div class="divider"></div>
+    <p class="section-label">Round Details</p>
+    <div class="card">
+      <div class="select-row">
+        <div class="select-group"><label>Format</label>
+          <select id="format">
+            <option value="sporting_clays">Sporting Clays</option>
+            <option value="fitasc">FITASC</option>
+            <option value="5stand">5-Stand</option>
+            <option value="practice">Practice</option>
+          </select>
+        </div>
+        <div class="select-group"><label>Conditions</label>
+          <select id="conditions">
+            <option value="ideal">Ideal</option>
+            <option value="windy">Windy</option>
+            <option value="rain">Rainy</option>
+            <option value="bright">Bright Sun</option>
+            <option value="overcast">Overcast</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <label style="display:block;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--fog);margin-bottom:8px;">Starting station</label>
+        <div id="startStationRow" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div style="font-size:11px;color:var(--fog);margin-top:8px;">Which station did you shoot first?</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <p class="section-label">Mental Game</p>
+    <div class="card">
+      <div class="mental-row">
+        <button class="mental-btn" data-value="locked_in" onclick="pickMental(this)"><span class="mental-emoji">🎯</span><span class="mental-label">Locked In</span></button>
+        <button class="mental-btn" data-value="average" onclick="pickMental(this)"><span class="mental-emoji">😐</span><span class="mental-label">Average</span></button>
+        <button class="mental-btn" data-value="off" onclick="pickMental(this)"><span class="mental-emoji">😤</span><span class="mental-label">Off Day</span></button>
+        <button class="mental-btn" data-value="pressure" onclick="pickMental(this)"><span class="mental-emoji">😰</span><span class="mental-label">Pressure</span></button>
+        <button class="mental-btn" data-value="recovered" onclick="pickMental(this)"><span class="mental-emoji">💪</span><span class="mental-label">Recovered</span></button>
+        <button class="mental-btn" data-value="inconsistent" onclick="pickMental(this)"><span class="mental-emoji">🎢</span><span class="mental-label">Inconsistent</span></button>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="nav-btn" onclick="goTo(1)">← Upload new</button>
+      <button class="nav-btn primary" id="submitBtn" onclick="getCoaching()">Get my coaching</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <!-- SCREEN 4: COACHING -->
+  <div class="screen" id="screen4">
+    <p class="section-label">Your Coaching</p>
+    <div class="coaching-card">
+      <div class="coaching-header">
+        <div class="coaching-icon">🎯</div>
+        <div><div class="coaching-title">Round Analysis</div><div class="coaching-subtitle" id="coachSub">Based on your scorecard</div></div>
+      </div>
+      <div class="score-chips" id="chips"></div>
+      <div class="coaching-body" id="coachBody"></div>
+      <div class="nav-row" style="margin:20px 0 0;">
+        <button class="nav-btn" onclick="goTo(3)">← Edit details</button>
+        <button class="nav-btn" onclick="resetApp()">New round →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://clayiq.vercel.app/api/coach';
+let stations = [], mental = null, imgSrc = '', startStation = 1;
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    compressImage(e.target.result, 1200, 0.82, function(compressed) {
+      imgSrc = compressed;
+      document.getElementById('prevImg2').src = compressed;
+      document.getElementById('prevImg3').src = compressed;
+      goTo(2);
+      readCard(compressed);
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function compressImage(dataUrl, maxDim, quality, callback) {
+  const img = new Image();
+  img.onload = function() {
+    let w = img.width, h = img.height;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+      else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src = dataUrl;
+}
+
+async function readCard(src) {
+  const base64 = src.split(',')[1];
+  const mime = src.split(';')[0].split(':')[1];
+  const debugEl = document.getElementById('debugMsg');
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
+            { type: 'text', text: 'You are a JSON data extractor. Output ONLY a valid JSON object. No words, no explanation, no markdown, no preamble. Just the JSON.\n\nThis is a sporting clays scorecard image. Extract every station score. Also look for T or R written next to each station.\n\nRequired output format:\n{"stations":[{"station":1,"hit":4,"total":5,"pairs":"true"},{"station":2,"hit":3,"total":5,"pairs":"report"},{"station":3,"hit":4,"total":5,"pairs":null}],"total_hit":75,"total_birds":100}\n\nRules:\n- pairs = "true" if T or True is written next to that station\n- pairs = "report" if R or Report is written next to that station\n- pairs = null if no notation visible\n- Use null for any score you cannot read clearly\n- If image is not a scorecard: {"error":"not a scorecard"}\n\nREMEMBER: Output the JSON object only. First character must be {. Last character must be }.' }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    if (!data.content || !data.content[0]) throw new Error('No content: ' + JSON.stringify(data));
+    const rawText = data.content[0].text;
+    debugEl.textContent = 'AI said: ' + rawText.substring(0, 200);
+    debugEl.classList.add('visible');
+    const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+    if (parsed.error) throw new Error(parsed.error);
+    stations = parsed.stations.map(function(s) {
+      return { station: s.station, hit: s.hit, total: s.total || 5, pairs: s.pairs || null };
+    });
+    buildList();
+    buildStartStations();
+    updateTotal();
+    debugEl.classList.remove('visible');
+    document.getElementById('prevBadge3').textContent = 'Scores read';
+    goTo(3);
+  } catch(err) {
+    debugEl.textContent = 'Error: ' + err.message;
+    debugEl.classList.add('visible');
+    setTimeout(function() {
+      stations = Array.from({length: 10}, function(_, i) {
+        return { station: i + 1, hit: null, total: 5, pairs: null };
+      });
+      buildList();
+      buildStartStations();
+      document.getElementById('prevBadge3').textContent = 'Enter scores manually';
+      debugEl.classList.remove('visible');
+      goTo(3);
+    }, 3000);
+  }
+}
+
+function buildList() {
+  const list = document.getElementById('stationList');
+  list.innerHTML = '';
+  stations.forEach(function(s, i) {
+    const weak = s.hit !== null && (s.total - s.hit) > 1;
+    const rCls = s.pairs === 'report' ? ' sel-report' : '';
+    const tCls = s.pairs === 'true' ? ' sel-true' : '';
+    const row = document.createElement('div');
+    row.className = 'station-tag-row' + (s.pairs ? ' tagged' : '');
+    row.id = 'row' + i;
+    row.innerHTML =
+      '<span class="stn-num">S' + s.station + '</span>' +
+      '<input class="stn-score-input" type="number" min="0" max="' + s.total + '" value="' + (s.hit !== null ? s.hit : '') + '" placeholder="—" oninput="editScore(' + i + ',this.value)">' +
+      '<span class="stn-birds" id="b' + i + '">' + (s.hit !== null ? s.hit + '/' + s.total : '?/' + s.total) + '</span>' +
+      '<div class="pairs-toggle">' +
+        '<button class="pairs-btn' + rCls + '" onclick="setPairs(' + i + ',\'report\',this)">R</button>' +
+        '<button class="pairs-btn' + tCls + '" onclick="setPairs(' + i + ',\'true\',this)">T</button>' +
+      '</div>' +
+      '<div class="weak-dot' + (weak ? ' on' : '') + '" id="w' + i + '"></div>';
+    list.appendChild(row);
+  });
+}
+
+function buildStartStations() {
+  const row = document.getElementById('startStationRow');
+  if (!row) return;
+  row.innerHTML = '';
+  const count = stations.length || 10;
+  for (let i = 1; i <= count; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'start-station-btn' + (i === startStation ? ' active' : '');
+    btn.textContent = i;
+    btn.onclick = (function(n) { return function() { startStation = n; buildStartStations(); }; })(i);
+    row.appendChild(btn);
+  }
+}
+
+function editScore(i, val) {
+  const n = parseInt(val);
+  stations[i].hit = isNaN(n) ? null : n;
+  const weak = stations[i].hit !== null && (stations[i].total - stations[i].hit) > 1;
+  document.getElementById('w' + i).classList.toggle('on', weak);
+  document.getElementById('b' + i).textContent = stations[i].hit !== null ? stations[i].hit + '/' + stations[i].total : '?/' + stations[i].total;
+  updateTotal();
+}
+
+function updateTotal() {
+  document.getElementById('totalDisplay').textContent = stations.reduce(function(s, d) { return s + (d.hit || 0); }, 0);
+}
+
+function setPairs(i, type, btn) {
+  stations[i].pairs = type;
+  document.getElementById('row' + i).classList.add('tagged');
+  document.getElementById('row' + i).querySelectorAll('.pairs-btn').forEach(function(b) { b.classList.remove('sel-report', 'sel-true'); });
+  btn.classList.add(type === 'report' ? 'sel-report' : 'sel-true');
+}
+
+function pickMental(btn) {
+  document.querySelectorAll('.mental-btn').forEach(function(b) { b.classList.remove('selected'); });
+  btn.classList.add('selected');
+  mental = btn.dataset.value;
+}
+
+async function getCoaching() {
+  const totalHit = stations.reduce(function(s, d) { return s + (d.hit || 0); }, 0);
+  const totalBirds = stations.reduce(function(s, d) { return s + (d.total || 5); }, 0);
+  const pct = Math.round((totalHit / totalBirds) * 100);
+  const format = document.getElementById('format').value;
+  const conditions = document.getElementById('conditions').value;
+  const mentalVal = mental || 'not reported';
+  const weak = stations.filter(function(s) { return s.hit !== null && (s.total - s.hit) > 1; })
+    .map(function(s) { return 'Station ' + s.station + ' (' + s.hit + '/' + s.total + (s.pairs ? ', ' + s.pairs + ' pairs' : '') + ')'; })
+    .join(', ');
+  const breakdown = stations.map(function(s) { return 'S' + s.station + ':' + (s.hit !== null ? s.hit : '?') + '/' + s.total + (s.pairs ? ' (' + s.pairs + ')' : ''); }).join(' ');
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'ANALYZING...';
+  document.getElementById('errorMsg').classList.remove('visible');
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: 'You are ClayIQ — an elite sporting clays performance coach.\n\nAnalyze like a coach:\n1. Identify patterns in the round. Look for clustered weak stations, isolated misses, pair-type trends, and whether the starting station may have influenced the early part of the round.\n2. Diagnose the most likely root cause. Use this logic: report pair misses usually suggest timing or second-bird decision issues; true pair misses usually suggest visual pickup or transition issues; spread misses usually suggest focus or mental consistency problems; clustered misses usually suggest a target presentation problem.\n3. Prioritize exactly ONE highest-leverage issue. Do not stack multiple fixes.\n\nImportant signals:\n- Weak stations matter more than total score\n- Pair type is a major clue to the likely cause\n- Station sequence can reveal momentum, settling in, or breakdown\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nOutput in exactly three sections with bold headers and no filler:\n\n**Round Read** — One sharp diagnosis. Focus on the biggest pattern or flaw, not the score. Be direct and specific.\n\n**Focus For Next Session** — Give exactly ONE highest-leverage fix. Include: 1) what to focus on, 2) how to execute it step by step, and 3) repetition structure for the drill. The drill must match the weak stations and pair types when available.\n\n**Next Round Mindset** — Give one mental cue based on the reported state using this guidance: pressure = simplify process and slow down routine; inconsistent = commit to a repeatable pre-shot routine; off day = reset and take one target at a time; locked in = reinforce what worked and avoid overthinking; recovered = reinforce the adjustment that helped; average or not reported = give a simple, steadying cue.\n\nTone rules:\n- Direct and confident\n- Slightly blunt but constructive\n- Use a simple vivid analogy only if it helps\n- No fluff, no motivational cliches, no chatbot language\n- Avoid generic advice like stay focused, keep practicing, or trust yourself\n- Do not repeat the score unless it supports the diagnosis\n\nKeep it under 300 words.'
+        }]
+      })
+    });
+    const data = await res.json();
+    let text = data.content[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    document.getElementById('chips').innerHTML =
+      '<span class="chip chip-score">' + totalHit + '/' + totalBirds + ' · ' + pct + '%</span>' +
+      '<span class="chip chip-weak">' + stations.filter(function(s) { return s.hit !== null && (s.total - s.hit) > 1; }).length + ' weak stations</span>' +
+      '<span class="chip chip-mental">' + mentalVal.replace(/_/g, ' ') + '</span>';
+    document.getElementById('coachSub').textContent = format.replace(/_/g, ' ') + ' · ' + conditions + ' · started S' + startStation;
+    document.getElementById('coachBody').innerHTML = text;
+    goTo(4);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch(err) {
+    const e = document.getElementById('errorMsg');
+    e.textContent = 'Coaching engine unavailable. Try again in a moment.';
+    e.classList.add('visible');
+    btn.disabled = false; btn.textContent = 'GET MY COACHING';
+  }
+}
+
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('screen' + n).classList.add('active');
+  for (let i = 1; i <= 4; i++) {
+    const c = document.getElementById('s' + i);
+    const nm = document.getElementById('sn' + i);
+    c.classList.remove('active', 'done');
+    if (nm) nm.classList.remove('active');
+    if (i < n) { c.classList.add('done'); c.textContent = '✓'; }
+    else if (i === n) { c.classList.add('active'); c.textContent = i; if (nm) nm.classList.add('active'); }
+    else { c.textContent = i; }
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function canNav(n) {
+  if (n === 1) return true;
+  if (n === 2 || n === 3) return stations.length > 0;
+  if (n === 4) return document.getElementById('coachBody').innerHTML.length > 0;
+  return false;
+}
+
+function resetApp() {
+  stations = []; mental = null; imgSrc = ''; startStation = 1;
+  document.getElementById('fileInput').value = '';
+  document.querySelectorAll('.mental-btn').forEach(function(b) { b.classList.remove('selected'); });
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitBtn').textContent = 'GET MY COACHING';
+  goTo(1);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
