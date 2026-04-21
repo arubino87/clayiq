@@ -1,6 +1,6 @@
 <!--
   ClayIQ
-  Version: 1.5.2
+  Version: 1.6.0
   Updated: 2026-04-20
 
   Changelog:
@@ -19,7 +19,8 @@
            Upload zone now uses direct click handler for cross-browser reliability
            File input hidden and triggered programmatically
   v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
-  v1.5.2 - Scorecard read uses claude-haiku-4-5-20251001 (300 tokens); coaching uses claude-sonnet-4-6 (600 tokens)
+  v1.6.0 - Removed all A.I.M. and Anthony Matarese references from coaching prompt
+           Replaced A.I.M. Mental Cue section with Next Round Mindset
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -302,8 +303,8 @@ async function readCard(src) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
         messages: [{
           role: 'user',
           content: [
@@ -430,10 +431,10 @@ async function getCoaching() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 600,
+        max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: 'You are ClayIQ — an expert sporting clays performance coach who combines technical shot analysis. Coach with direct, encouraging, analogy-driven feedback under 300 words.\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nRespond with exactly three sections using bold headers:\n\n**Round Read** — One honest sentence. Direct, not sugarcoated.\n\n**Focus For Next Session** — The single highest-leverage fix, with one specific drill tailored to their weak stations and pair types.\n\n**A.I.M. Mental Cue** — One specific cue referencing Attention, Intention, or Management based on their mental game data.\n\nSound like a coach who has seen everything. Not a chatbot.'
+          content: 'You are ClayIQ — a sporting clays performance coach. Be direct, analogy-driven, under 300 words.\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nThree sections, bold headers, no filler:\n\n**Round Read** — One honest sentence. Call it like you see it.\n\n**Focus For Next Session** — Highest-leverage fix. One drill specific to their weak stations and pair types.\n\n**Next Round Mindset** — One mental cue based on their reported state. Sound like a coach, not a chatbot.'
         }]
       })
     });
