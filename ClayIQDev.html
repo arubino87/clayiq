@@ -1,7 +1,7 @@
 <!--
   ClayIQ
-  Version: 1.7.0
-  Updated: 2026-04-21
+  Version: 1.5.2-dev
+  Updated: 2026-04-20
 
   Changelog:
   v1.0.0 - Initial build: score slider, station selection, mental game, AI coaching
@@ -15,22 +15,18 @@
   v1.4.2 - Added orange dot legend explanation
   v1.4.3 - Added starting station selector — affects coaching analysis
   v1.4.4 - Added automatic T/R pair type reading from scorecard notation
+  v1.5.2-dev - Development version with DEV badge, dev API endpoint
+  v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
   v1.5.0 - Full clean rebuild to resolve upload not triggering on mobile/Edge
            Upload zone now uses direct click handler for cross-browser reliability
            File input hidden and triggered programmatically
-  v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
-  v1.6.0 - Removed all A.I.M. and Anthony Matarese references from coaching prompt
-           Replaced A.I.M. Mental Cue section with Next Round Mindset
-  v1.7.0 - Upgraded coaching prompt with pattern detection, root-cause diagnosis,
-           single-issue prioritization, structured drill instructions, and
-           deterministic mental cue guidance
 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClayIQ</title>
+<title>ClayIQ DEV</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--clay:#C4531A;--clay-dark:#8B3A10;--clay-light:#F2784B;--smoke:#1A1A18;--ash:#2C2C28;--dust:#3D3D38;--fog:#8A8A82;--paper:#F5F2EC;--cream:#EDE9E0;--white:#FAFAF7;--success:#4A9E6B;}
@@ -142,6 +138,7 @@ select:focus{border-color:var(--clay);}
       <span class="logo-iq">IQ</span>
     </div>
     <p class="tagline">Score · Analyze · Improve</p>
+    <div style="display:inline-block;margin-top:8px;background:var(--clay);color:var(--white);font-size:10px;font-weight:600;letter-spacing:2px;padding:3px 10px;border-radius:6px;text-transform:uppercase;">Development Build</div>
   </header>
 
   <div class="steps">
@@ -262,7 +259,7 @@ select:focus{border-color:var(--clay);}
 </div>
 
 <script>
-const API = 'https://clayiq.vercel.app/api/coach';
+const API = 'https://clayiq.vercel.app/api/coach-dev';
 let stations = [], mental = null, imgSrc = '', startStation = 1;
 
 function handleFile(input) {
@@ -437,7 +434,7 @@ async function getCoaching() {
         max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: 'You are ClayIQ — an elite sporting clays performance coach.\n\nAnalyze like a coach:\n1. Identify patterns in the round. Look for clustered weak stations, isolated misses, pair-type trends, and whether the starting station may have influenced the early part of the round.\n2. Diagnose the most likely root cause. Use this logic: report pair misses usually suggest timing or second-bird decision issues; true pair misses usually suggest visual pickup or transition issues; spread misses usually suggest focus or mental consistency problems; clustered misses usually suggest a target presentation problem.\n3. Prioritize exactly ONE highest-leverage issue. Do not stack multiple fixes.\n\nImportant signals:\n- Weak stations matter more than total score\n- Pair type is a major clue to the likely cause\n- Station sequence can reveal momentum, settling in, or breakdown\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nOutput in exactly three sections with bold headers and no filler:\n\n**Round Read** — One sharp diagnosis. Focus on the biggest pattern or flaw, not the score. Be direct and specific.\n\n**Focus For Next Session** — Give exactly ONE highest-leverage fix. Include: 1) what to focus on, 2) how to execute it step by step, and 3) repetition structure for the drill. The drill must match the weak stations and pair types when available.\n\n**Next Round Mindset** — Give one mental cue based on the reported state using this guidance: pressure = simplify process and slow down routine; inconsistent = commit to a repeatable pre-shot routine; off day = reset and take one target at a time; locked in = reinforce what worked and avoid overthinking; recovered = reinforce the adjustment that helped; average or not reported = give a simple, steadying cue.\n\nTone rules:\n- Direct and confident\n- Slightly blunt but constructive\n- Use a simple vivid analogy only if it helps\n- No fluff, no motivational cliches, no chatbot language\n- Avoid generic advice like stay focused, keep practicing, or trust yourself\n- Do not repeat the score unless it supports the diagnosis\n\nKeep it under 300 words.'
+          content: 'You are ClayIQ — an expert sporting clays performance coach who combines technical shot analysis with A.I.M. (Attention, Intention, Management) mental game principles by Anthony Matarese. Coach with direct, encouraging, analogy-driven feedback under 300 words.\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nRespond with exactly three sections using bold headers:\n\n**Round Read** — One honest sentence. Direct, not sugarcoated.\n\n**Focus For Next Session** — The single highest-leverage fix, with one specific drill tailored to their weak stations and pair types.\n\n**A.I.M. Mental Cue** — One specific cue referencing Attention, Intention, or Management based on their mental game data.\n\nSound like a coach who has seen everything. Not a chatbot.'
         }]
       })
     });
