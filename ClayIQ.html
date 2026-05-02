@@ -1,6 +1,6 @@
 <!--
   ClayIQ
-  Version: 1.6.0
+  Version: 1.6.1
   Updated: 2026-05-01
 
   Changelog:
@@ -20,6 +20,9 @@
            File input hidden and triggered programmatically
   v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
   v1.5.2 - Removed all references to A.I.M. and Anthony Matarese (brand protected)
+  v1.6.1 - Fixed file upload not firing after selection on mobile/Edge/Safari
+           Replaced onchange attribute and display:none with addEventListener and
+           CSS opacity hide — most reliable cross-browser pattern
   v1.6.0 - Integrated expert knowledge block from Foundation, Advanced, and Mental Game transcripts
            Coaching prompt now references specific shot types, fault patterns, vision system,
            synchronization, mental game protocols, and pair strategy
@@ -156,8 +159,8 @@ select:focus{border-color:var(--clay);}
   <!-- SCREEN 1: UPLOAD -->
   <div class="screen active" id="screen1">
     <p class="section-label">Scorecard</p>
-    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-      <input type="file" accept="image/*" id="fileInput" onchange="handleFile(this)" style="display:none;">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" accept="image/*" id="fileInput" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
       <div class="upload-icon">📸</div>
       <div class="upload-title">Upload Scorecard</div>
       <p class="upload-sub">Choose from your photo library or take a photo.<br>ClayIQ reads your scores automatically.</p>
@@ -264,8 +267,7 @@ select:focus{border-color:var(--clay);}
 const API = 'https://clayiq.vercel.app/api/coach';
 let stations = [], mental = null, imgSrc = '', startStation = 1;
 
-function handleFile(input) {
-  const file = input.files[0];
+function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -489,6 +491,18 @@ function resetApp() {
   goTo(1);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Wire up upload zone — most reliable cross-browser approach
+document.getElementById('uploadZone').addEventListener('click', function() {
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', function() {
+  if (this.files && this.files[0]) {
+    handleFile(this.files[0]);
+  }
+});
 </script>
 </body>
 </html>
