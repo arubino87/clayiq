@@ -1,7 +1,7 @@
 <!--
   ClayIQ
-  Version: 1.6.2
-  Updated: 2026-05-01
+  Version: 1.7.0
+  Updated: 2026-05-03
 
   Changelog:
   v1.0.0 - Initial build: score slider, station selection, mental game, AI coaching
@@ -20,13 +20,19 @@
            File input hidden and triggered programmatically
   v1.5.1 - Strengthened scorecard reading prompt to prevent conversational responses
   v1.5.2 - Removed all references to A.I.M. and Anthony Matarese (brand protected)
-  v1.6.2 - File input now covers upload zone natively — eliminates JS click() trigger entirely
-  v1.6.1 - Fixed file upload not firing after selection on mobile/Edge/Safari
-           Replaced onchange attribute and display:none with addEventListener and
-           CSS opacity hide — most reliable cross-browser pattern
   v1.6.0 - Integrated expert knowledge block from Foundation, Advanced, and Mental Game transcripts
            Coaching prompt now references specific shot types, fault patterns, vision system,
            synchronization, mental game protocols, and pair strategy
+  v1.6.1 - Fixed file upload not firing after selection on mobile/Edge/Safari
+           Replaced onchange attribute and display:none with addEventListener and
+           CSS opacity hide — most reliable cross-browser pattern
+  v1.6.2 - File input now covers upload zone natively — eliminates JS click() trigger entirely
+  v1.6.3 - Added HEIC/HEIF support for Apple iPhone photos — auto-converts to JPEG before processing
+  v1.6.4 - Fixed HEIC detection on desktop where MIME type is empty or octet-stream
+  v1.7.0 - Added full statistics screen (Step 4) before AI coaching (Step 5)
+           Stats: bird 1/2 hit %, pair completion, double miss, recovery rate,
+           front/back half split, station bar chart with bird sequence dots,
+           report vs true pair table, round structure curve, key insights
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -35,8 +41,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ClayIQ</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <style>
-:root{--clay:#C4531A;--clay-dark:#8B3A10;--clay-light:#F2784B;--smoke:#1A1A18;--ash:#2C2C28;--dust:#3D3D38;--fog:#8A8A82;--paper:#F5F2EC;--cream:#EDE9E0;--white:#FAFAF7;--success:#4A9E6B;}
+:root{--clay:#C4531A;--clay-dark:#8B3A10;--clay-light:#F2784B;--smoke:#1A1A18;--ash:#2C2C28;--dust:#3D3D38;--fog:#8A8A82;--paper:#F5F2EC;--cream:#EDE9E0;--white:#FAFAF7;--success:#4A9E6B;--warn:#E2A020;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--smoke);color:var(--paper);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(196,83,26,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 80% 90%,rgba(196,83,26,0.05) 0%,transparent 60%);pointer-events:none;z-index:0;}
@@ -48,14 +55,14 @@ header{padding:48px 24px 32px;}
 .logo-dot{width:8px;height:8px;background:var(--clay);border-radius:50%;margin-bottom:6px;flex-shrink:0;}
 .tagline{font-size:12px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--fog);}
 .steps{display:flex;align-items:center;padding:0 24px;margin-bottom:28px;}
-.step{display:flex;align-items:center;gap:8px;flex:1;}
+.step{display:flex;align-items:center;gap:6px;flex:1;}
 .step-circle{width:28px;height:28px;border-radius:50%;background:var(--dust);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);flex-shrink:0;transition:all 0.3s;cursor:default;padding:0;line-height:1;}
 .step-circle.active{background:var(--clay);border-color:var(--clay);color:var(--white);}
 .step-circle.done{background:var(--success);border-color:var(--success);color:var(--white);cursor:pointer;}
 .step-circle.done:hover{opacity:0.8;}
-.step-name{font-size:11px;font-weight:500;color:var(--fog);letter-spacing:0.5px;transition:color 0.3s;}
+.step-name{font-size:10px;font-weight:500;color:var(--fog);letter-spacing:0.5px;transition:color 0.3s;white-space:nowrap;}
 .step-name.active{color:var(--paper);}
-.step-line{flex:1;height:1px;background:rgba(255,255,255,0.08);margin:0 8px;}
+.step-line{flex:1;height:1px;background:rgba(255,255,255,0.08);margin:0 4px;}
 .nav-row{display:flex;justify-content:space-between;align-items:center;margin:12px 16px 0;gap:10px;}
 .nav-btn{flex:1;padding:11px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:var(--fog);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;}
 .nav-btn:hover{border-color:var(--clay);color:var(--clay-light);}
@@ -67,7 +74,6 @@ header{padding:48px 24px 32px;}
 .screen{display:none;}.screen.active{display:block;}
 .upload-zone{margin:0 16px 16px;border:2px dashed rgba(196,83,26,0.3);border-radius:16px;padding:40px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:rgba(196,83,26,0.03);position:relative;}
 .upload-zone:hover{border-color:var(--clay);background:rgba(196,83,26,0.08);}
-.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
 .upload-icon{width:56px;height:56px;background:rgba(196,83,26,0.12);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;}
 .upload-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--white);margin-bottom:6px;}
 .upload-sub{font-size:13px;color:var(--fog);line-height:1.5;}
@@ -113,10 +119,6 @@ select:focus{border-color:var(--clay);}
 .mental-emoji{font-size:20px;display:block;margin-bottom:4px;}
 .mental-label{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--fog);}
 .divider{height:1px;background:rgba(255,255,255,0.05);margin:4px 16px 16px;}
-.cta-btn{display:block;width:calc(100% - 32px);margin:8px 16px 0;padding:18px;background:var(--clay);color:var(--white);border:none;border-radius:14px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
-.cta-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1) 0%,transparent 50%);}
-.cta-btn:hover{background:var(--clay-light);transform:translateY(-1px);box-shadow:0 8px 24px rgba(196,83,26,0.35);}
-.cta-btn:disabled{background:var(--dust);color:var(--fog);cursor:not-allowed;transform:none;box-shadow:none;}
 .coaching-card{margin:0 16px 16px;background:var(--ash);border-radius:16px;border:1px solid rgba(196,83,26,0.25);padding:24px 20px;position:relative;overflow:hidden;animation:slideUp 0.4s ease;}
 @keyframes slideUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 .coaching-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--clay-dark),var(--clay),var(--clay-light));}
@@ -134,6 +136,87 @@ select:focus{border-color:var(--clay);}
 .error-msg{margin:10px 16px 0;background:rgba(196,83,26,0.1);border:1px solid rgba(196,83,26,0.3);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--clay-light);display:none;}
 .error-msg.visible{display:block;}
 .info-note{margin:-4px 16px 16px;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid rgba(255,255,255,0.06);font-size:12px;color:var(--fog);line-height:1.5;}
+
+/* === STATS STYLES === */
+.hero-card{margin:0 16px 16px;background:var(--ash);border-radius:16px;border:1px solid rgba(196,83,26,0.2);padding:24px 20px;position:relative;overflow:hidden;}
+.hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--clay-dark),var(--clay),var(--clay-light));}
+.hero-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;}
+.hero-score{font-family:'Bebas Neue',sans-serif;font-size:72px;color:var(--white);line-height:1;letter-spacing:2px;}
+.hero-denom{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--fog);letter-spacing:1px;margin-bottom:10px;}
+.hero-pct{font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--clay-light);letter-spacing:2px;text-align:right;}
+.hero-pct-label{font-size:11px;color:var(--fog);text-align:right;margin-bottom:6px;}
+.hero-meta{display:flex;gap:6px;flex-wrap:wrap;}
+.meta-chip{padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:0.5px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:var(--fog);}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 16px;}
+.stat-box{background:var(--ash);border-radius:14px;border:1px solid rgba(255,255,255,0.06);padding:16px;position:relative;overflow:hidden;}
+.stat-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(196,83,26,0.3),transparent);}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--white);letter-spacing:1px;line-height:1;margin-bottom:4px;}
+.stat-val.good{color:#6FCF97;}
+.stat-val.warn{color:var(--warn);}
+.stat-val.bad{color:var(--clay-light);}
+.stat-label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--fog);line-height:1.4;}
+.stat-sub{font-size:11px;color:var(--fog);margin-top:5px;opacity:0.7;}
+.bird-compare{display:flex;gap:12px;margin-bottom:14px;}
+.bird-col{flex:1;background:var(--dust);border-radius:12px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.05);}
+.bird-col.b1{border-color:rgba(196,83,26,0.2);}
+.bird-col.b2{border-color:rgba(74,158,107,0.2);}
+.bird-col-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--fog);margin-bottom:8px;}
+.bird-col-val{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:1px;line-height:1;}
+.bird-col.b1 .bird-col-val{color:var(--clay-light);}
+.bird-col.b2 .bird-col-val{color:#6FCF97;}
+.bird-col-sub{font-size:11px;color:var(--fog);margin-top:4px;}
+.recovery-row{background:var(--dust);border-radius:10px;padding:12px 14px;border:1px solid rgba(255,255,255,0.05);}
+.recovery-label{font-size:11px;color:var(--fog);margin-bottom:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;}
+.recovery-stats{display:flex;justify-content:space-between;align-items:center;}
+.recovery-stat{text-align:center;}
+.recovery-stat-val{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;line-height:1;}
+.recovery-stat-lbl{font-size:10px;color:var(--fog);margin-top:3px;}
+.recovery-divider{width:1px;height:36px;background:rgba(255,255,255,0.08);}
+.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.bar-row{display:flex;align-items:center;gap:8px;}
+.bar-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--fog);width:26px;flex-shrink:0;text-align:right;}
+.bar-track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:99px;}
+.bar-fill.high{background:var(--success);}
+.bar-fill.mid{background:var(--warn);}
+.bar-fill.low{background:var(--clay);}
+.bar-seq{display:flex;gap:2px;flex-shrink:0;}
+.bird-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.bird-dot.hit{background:var(--success);}
+.bird-dot.miss{background:var(--clay);}
+.bar-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--fog);width:34px;text-align:right;flex-shrink:0;}
+.bar-legend{display:flex;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);flex-wrap:wrap;}
+.bar-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--fog);}
+.bar-legend-swatch{width:10px;height:10px;border-radius:3px;}
+.pair-table{width:100%;border-collapse:collapse;}
+.pair-table th{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--fog);text-align:left;padding:0 0 10px;border-bottom:1px solid rgba(255,255,255,0.06);}
+.pair-table th:not(:first-child){text-align:center;}
+.pair-table td{padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:var(--cream);}
+.pair-table td:not(:first-child){text-align:center;font-family:'DM Mono',monospace;font-size:12px;}
+.pair-table tr:last-child td{border-bottom:none;}
+.pair-type-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
+.badge-r{background:rgba(196,83,26,0.2);color:var(--clay-light);border:1px solid rgba(196,83,26,0.3);}
+.badge-t{background:rgba(74,158,107,0.15);color:#6FCF97;border:1px solid rgba(74,158,107,0.2);}
+.val-good{color:#6FCF97;}
+.val-warn{color:var(--warn);}
+.val-bad{color:var(--clay-light);}
+.val-na{color:var(--fog);}
+.structure-row{display:flex;justify-content:space-between;margin-bottom:16px;gap:8px;}
+.structure-stat{text-align:center;flex:1;}
+.structure-val{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;line-height:1;}
+.structure-lbl{font-size:10px;color:var(--fog);text-transform:uppercase;letter-spacing:1px;margin-top:4px;line-height:1.3;}
+.structure-divider{width:1px;background:rgba(255,255,255,0.06);flex-shrink:0;}
+.curve-wrap{position:relative;height:72px;margin-bottom:6px;}
+.curve-wrap svg{width:100%;height:100%;}
+.curve-labels{display:flex;justify-content:space-between;}
+.curve-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--fog);}
+.insight-card{margin:0 16px 16px;background:rgba(196,83,26,0.05);border-radius:14px;border:1px solid rgba(196,83,26,0.18);padding:16px 18px;}
+.insight-row{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
+.insight-row:last-child{margin-bottom:0;}
+.insight-icon{font-size:16px;flex-shrink:0;margin-top:2px;}
+.insight-text{font-size:13px;color:var(--cream);line-height:1.5;}
+.insight-text strong{color:var(--white);}
+.no-data-note{text-align:center;font-size:12px;color:var(--fog);padding:8px 0;}
 </style>
 </head>
 <body>
@@ -150,18 +233,20 @@ select:focus{border-color:var(--clay);}
   <div class="steps">
     <div class="step"><button class="step-circle active" id="s1" onclick="canNav(1)&&goTo(1)">1</button><span class="step-name active" id="sn1">Upload</span></div>
     <div class="step-line"></div>
-    <div class="step"><button class="step-circle" id="s2" onclick="canNav(2)&&goTo(3)">2</button><span class="step-name" id="sn2">Review</span></div>
+    <div class="step"><button class="step-circle" id="s2" onclick="canNav(2)&&goTo(2)">2</button><span class="step-name" id="sn2">Review</span></div>
     <div class="step-line"></div>
     <div class="step"><button class="step-circle" id="s3" onclick="canNav(3)&&goTo(3)">3</button><span class="step-name" id="sn3">Details</span></div>
     <div class="step-line"></div>
-    <div class="step"><button class="step-circle" id="s4" onclick="canNav(4)&&goTo(4)">4</button><span class="step-name" id="sn4">Coaching</span></div>
+    <div class="step"><button class="step-circle" id="s4" onclick="canNav(4)&&goTo(4)">4</button><span class="step-name" id="sn4">Stats</span></div>
+    <div class="step-line"></div>
+    <div class="step"><button class="step-circle" id="s5" onclick="canNav(5)&&goTo(5)">5</button><span class="step-name" id="sn5">Coaching</span></div>
   </div>
 
   <!-- SCREEN 1: UPLOAD -->
   <div class="screen active" id="screen1">
     <p class="section-label">Scorecard</p>
     <div class="upload-zone" id="uploadZone">
-      <input type="file" accept="image/*" id="fileInput" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
+      <input type="file" accept="image/*,.heic,.heif" id="fileInput" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
       <div class="upload-icon">📸</div>
       <div class="upload-title">Upload Scorecard</div>
       <p class="upload-sub">Choose from your photo library or take a photo.<br>ClayIQ reads your scores automatically.</p>
@@ -241,13 +326,49 @@ select:focus{border-color:var(--clay);}
 
     <div class="nav-row">
       <button class="nav-btn" onclick="goTo(1)">← Upload new</button>
-      <button class="nav-btn primary" id="submitBtn" onclick="getCoaching()">Get my coaching</button>
+      <button class="nav-btn primary" onclick="buildStats();goTo(4);">View my stats →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: STATS -->
+  <div class="screen" id="screen4">
+    <p class="section-label">Round Statistics</p>
+
+    <!-- Hero score -->
+    <div class="hero-card" id="statsHero"></div>
+
+    <!-- Key numbers -->
+    <p class="section-label">Key Numbers</p>
+    <div class="stat-grid" id="statGrid"></div>
+
+    <!-- Bird position -->
+    <p class="section-label">Bird Position Analysis</p>
+    <div class="card" id="birdCard"></div>
+
+    <!-- Station chart -->
+    <p class="section-label">Station Performance</p>
+    <div class="card" id="stationChart"></div>
+
+    <!-- Round structure -->
+    <p class="section-label">Round Structure</p>
+    <div class="card" id="structureCard"></div>
+
+    <!-- Pair type table -->
+    <div id="pairTableWrap"></div>
+
+    <!-- Insights -->
+    <p class="section-label">What the Numbers Say</p>
+    <div class="insight-card" id="insightCard"></div>
+
+    <div class="nav-row">
+      <button class="nav-btn" onclick="goTo(3)">← Edit details</button>
+      <button class="nav-btn primary" id="coachBtn" onclick="getCoaching()">Get my coaching →</button>
     </div>
     <div class="error-msg" id="errorMsg"></div>
   </div>
 
-  <!-- SCREEN 4: COACHING -->
-  <div class="screen" id="screen4">
+  <!-- SCREEN 5: COACHING -->
+  <div class="screen" id="screen5">
     <p class="section-label">Your Coaching</p>
     <div class="coaching-card">
       <div class="coaching-header">
@@ -257,7 +378,7 @@ select:focus{border-color:var(--clay);}
       <div class="score-chips" id="chips"></div>
       <div class="coaching-body" id="coachBody"></div>
       <div class="nav-row" style="margin:20px 0 0;">
-        <button class="nav-btn" onclick="goTo(3)">← Edit details</button>
+        <button class="nav-btn" onclick="goTo(4)">← Stats</button>
         <button class="nav-btn" onclick="resetApp()">New round →</button>
       </div>
     </div>
@@ -268,8 +389,20 @@ select:focus{border-color:var(--clay);}
 const API = 'https://clayiq.vercel.app/api/coach';
 let stations = [], mental = null, imgSrc = '', startStation = 1;
 
-function handleFile(file) {
+// ── FILE HANDLING ──────────────────────────────────────────────
+async function handleFile(file) {
   if (!file) return;
+  const fname = file.name.toLowerCase();
+  const isHeic = fname.endsWith('.heic') || fname.endsWith('.heif') ||
+    file.type === 'image/heic' || file.type === 'image/heif' ||
+    file.type === '' || file.type === 'application/octet-stream';
+  if (isHeic) {
+    try {
+      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      const blob = Array.isArray(converted) ? converted[0] : converted;
+      file = new File([blob], fname.replace(/\.heic$|\.heif$/, '.jpg'), { type: 'image/jpeg' });
+    } catch(err) { console.warn('HEIC conversion skipped:', err); }
+  }
   const reader = new FileReader();
   reader.onload = function(e) {
     compressImage(e.target.result, 1200, 0.82, function(compressed) {
@@ -299,6 +432,7 @@ function compressImage(dataUrl, maxDim, quality, callback) {
   img.src = dataUrl;
 }
 
+// ── SCORECARD READING ──────────────────────────────────────────
 async function readCard(src) {
   const base64 = src.split(',')[1];
   const mime = src.split(';')[0].split(':')[1];
@@ -351,6 +485,7 @@ async function readCard(src) {
   }
 }
 
+// ── REVIEW SCREEN ──────────────────────────────────────────────
 function buildList() {
   const list = document.getElementById('stationList');
   list.innerHTML = '';
@@ -414,10 +549,336 @@ function pickMental(btn) {
   mental = btn.dataset.value;
 }
 
-async function getCoaching() {
+// ── STATISTICS ─────────────────────────────────────────────────
+function computeStats() {
   const totalHit = stations.reduce(function(s, d) { return s + (d.hit || 0); }, 0);
   const totalBirds = stations.reduce(function(s, d) { return s + (d.total || 5); }, 0);
-  const pct = Math.round((totalHit / totalBirds) * 100);
+  const pct = totalBirds > 0 ? Math.round((totalHit / totalBirds) * 100) : 0;
+
+  // Bird 1 / Bird 2 — approximate from hit/total assuming pairs
+  // For each station: pairs = floor(total/2), bird1 hits estimated from pattern
+  // We estimate: if hit >= ceil(total/2), bird1 = ceil(total/2) else hit
+  // Better: distribute hits evenly across birds, favour bird1
+  var b1hit = 0, b1total = 0, b2hit = 0, b2total = 0;
+  var pairComplete = 0, pairTotal = 0, doubleMiss = 0;
+  var b1miss_b2hit = 0, b1miss_total = 0;
+
+  stations.forEach(function(s) {
+    if (s.hit === null) return;
+    var pairs = Math.floor(s.total / 2);
+    var extra = s.total % 2; // odd bird
+    pairTotal += pairs;
+    b1total += pairs + extra;
+    b2total += pairs;
+
+    // Estimate bird1/bird2 split from score
+    // Strategy: fill pairs from hits, assume bird1 hit first
+    var hits = s.hit;
+    var b1h = 0, b2h = 0;
+    for (var p = 0; p < pairs; p++) {
+      if (hits >= 2) { b1h++; b2h++; hits -= 2; pairComplete++; }
+      else if (hits === 1) { b1h++; hits--; }
+      else { doubleMiss++; b1miss_total++; }
+    }
+    if (extra && hits > 0) b1h++;
+    b1hit += b1h;
+    b2hit += b2h;
+    // Approximate recovery: stations where b1 missed but b2 hit
+    var b1missed = pairs - b1h;
+    b1miss_total = b1miss_total; // already counted above in loop
+  });
+
+  // Recalculate b1miss with better model
+  b1miss_total = 0; b1miss_b2hit = 0;
+  stations.forEach(function(s) {
+    if (s.hit === null) return;
+    var pairs = Math.floor(s.total / 2);
+    var hits = s.hit;
+    for (var p = 0; p < pairs; p++) {
+      if (hits >= 2) { hits -= 2; }
+      else if (hits === 1) { hits--; b1miss_total++; b1miss_b2hit++; }
+      else { b1miss_total++; }
+    }
+  });
+
+  var recoveryRate = b1miss_total > 0 ? Math.round((b1miss_b2hit / b1miss_total) * 100) : null;
+  var pairCompletePct = pairTotal > 0 ? Math.round((pairComplete / pairTotal) * 100) : 0;
+  var doubleMissPct = pairTotal > 0 ? Math.round((doubleMiss / pairTotal) * 100) : 0;
+  var b1pct = b1total > 0 ? Math.round((b1hit / b1total) * 100) : 0;
+  var b2pct = b2total > 0 ? Math.round((b2hit / b2total) * 100) : 0;
+
+  // Front/back half
+  var half = Math.floor(stations.length / 2);
+  var frontHit = 0, frontTotal = 0, backHit = 0, backTotal = 0;
+  stations.forEach(function(s, i) {
+    if (s.hit === null) return;
+    if (i < half) { frontHit += s.hit; frontTotal += s.total; }
+    else { backHit += s.hit; backTotal += s.total; }
+  });
+  var frontPct = frontTotal > 0 ? Math.round((frontHit / frontTotal) * 100) : null;
+  var backPct = backTotal > 0 ? Math.round((backHit / backTotal) * 100) : null;
+
+  // Opening / closing station (based on startStation)
+  var openIdx = stations.findIndex(function(s) { return s.station === startStation; });
+  var closeIdx = openIdx > 0 ? openIdx - 1 : stations.length - 1;
+  var openStn = stations[openIdx] || null;
+  var closeStn = stations[closeIdx] || null;
+  var openPct = openStn && openStn.hit !== null ? Math.round((openStn.hit / openStn.total) * 100) : null;
+  var closePct = closeStn && closeStn.hit !== null ? Math.round((closeStn.hit / closeStn.total) * 100) : null;
+
+  // Per-station pct for curve
+  var stationPcts = stations.map(function(s) {
+    return s.hit !== null ? Math.round((s.hit / s.total) * 100) : null;
+  });
+
+  // Report vs True pair stats
+  var reportStations = stations.filter(function(s) { return s.pairs === 'report' && s.hit !== null; });
+  var trueStations = stations.filter(function(s) { return s.pairs === 'true' && s.hit !== null; });
+  function pairTypeStats(arr) {
+    if (!arr.length) return null;
+    var hit = arr.reduce(function(s,d){return s+d.hit;},0);
+    var total = arr.reduce(function(s,d){return s+d.total;},0);
+    var pairs = Math.floor(total/2);
+    var h = hit; var b1h=0,b2h=0,pc=0,b1miss=0,b1missb2=0;
+    arr.forEach(function(s){
+      var p=Math.floor(s.total/2),hh=s.hit;
+      for(var i=0;i<p;i++){
+        if(hh>=2){b1h++;b2h++;pc++;hh-=2;}
+        else if(hh===1){b1h++;hh--;b1miss++;b1missb2++;}
+        else{b1miss++;}
+      }
+    });
+    return {
+      overall: total>0?Math.round((hit/total)*100):0,
+      b1: (pairs)>0?Math.round((b1h/pairs)*100):0,
+      b2: (pairs)>0?Math.round((b2h/pairs)*100):0,
+      recovery: b1miss>0?Math.round((b1missb2/b1miss)*100):null
+    };
+  }
+  var rStats = pairTypeStats(reportStations);
+  var tStats = pairTypeStats(trueStations);
+
+  return {
+    totalHit, totalBirds, pct,
+    b1pct, b2pct, b1hit, b1total, b2hit, b2total,
+    pairCompletePct, doubleMissPct, recoveryRate,
+    frontPct, backPct,
+    openPct, closePct, openStn, closeStn,
+    stationPcts,
+    rStats, tStats
+  };
+}
+
+function colorClass(pct) {
+  if (pct === null) return '';
+  if (pct >= 75) return 'good';
+  if (pct >= 50) return 'warn';
+  return 'bad';
+}
+function tableColorClass(pct) {
+  if (pct === null) return 'val-na';
+  if (pct >= 75) return 'val-good';
+  if (pct >= 50) return 'val-warn';
+  return 'val-bad';
+}
+function barClass(pct) {
+  if (pct === null) return 'mid';
+  if (pct >= 75) return 'high';
+  if (pct >= 50) return 'mid';
+  return 'low';
+}
+function fmtPct(v) { return v !== null ? v + '%' : '—'; }
+
+function buildStats() {
+  const st = computeStats();
+  const format = document.getElementById('format').value;
+  const conditions = document.getElementById('conditions').value;
+  const mentalVal = mental || 'not reported';
+
+  // HERO
+  document.getElementById('statsHero').innerHTML =
+    '<div class="hero-row">' +
+      '<div><div style="display:flex;align-items:baseline;gap:6px;"><span class="hero-score">' + st.totalHit + '</span><span class="hero-denom">/' + st.totalBirds + '</span></div><div style="font-size:12px;color:var(--fog);">Total birds hit</div></div>' +
+      '<div><div class="hero-pct-label">Hit rate</div><div class="hero-pct">' + st.pct + '%</div></div>' +
+    '</div>' +
+    '<div class="hero-meta">' +
+      '<span class="meta-chip">' + format.replace(/_/g,' ') + '</span>' +
+      '<span class="meta-chip">' + conditions + '</span>' +
+      '<span class="meta-chip">Started S' + startStation + '</span>' +
+      '<span class="meta-chip">' + mentalVal.replace(/_/g,' ') + '</span>' +
+    '</div>';
+
+  // KEY NUMBERS GRID
+  document.getElementById('statGrid').innerHTML =
+    '<div class="stat-box"><div class="stat-val ' + colorClass(st.b1pct) + '">' + fmtPct(st.b1pct) + '</div><div class="stat-label">Bird 1 Hit Rate</div><div class="stat-sub">First of each pair</div></div>' +
+    '<div class="stat-box"><div class="stat-val ' + colorClass(st.b2pct) + '">' + fmtPct(st.b2pct) + '</div><div class="stat-label">Bird 2 Hit Rate</div><div class="stat-sub">Second of each pair</div></div>' +
+    '<div class="stat-box"><div class="stat-val ' + colorClass(st.pairCompletePct) + '">' + fmtPct(st.pairCompletePct) + '</div><div class="stat-label">Pair Completion</div><div class="stat-sub">Both birds hit</div></div>' +
+    '<div class="stat-box"><div class="stat-val ' + (st.doubleMissPct > 20 ? 'bad' : st.doubleMissPct > 10 ? 'warn' : 'good') + '">' + fmtPct(st.doubleMissPct) + '</div><div class="stat-label">Double Miss</div><div class="stat-sub">Both birds dropped</div></div>' +
+    '<div class="stat-box"><div class="stat-val ' + colorClass(st.recoveryRate) + '">' + fmtPct(st.recoveryRate) + '</div><div class="stat-label">Recovery Rate</div><div class="stat-sub">Bird 2 after missing Bird 1</div></div>' +
+    '<div class="stat-box"><div class="stat-val ' + colorClass(st.frontPct) + '">' + fmtPct(st.frontPct) + '</div><div class="stat-label">Front Half</div><div class="stat-sub">Stations 1–' + Math.floor(stations.length/2) + '</div></div>';
+
+  // BIRD POSITION CARD
+  var recHtml = st.recoveryRate !== null
+    ? '<div class="recovery-stats">' +
+        '<div class="recovery-stat"><div class="recovery-stat-val ' + colorClass(st.recoveryRate) + '">' + st.recoveryRate + '%</div><div class="recovery-stat-lbl">Recover on Bird 2</div></div>' +
+        '<div class="recovery-divider"></div>' +
+        '<div class="recovery-stat"><div class="recovery-stat-val bad">' + (100 - st.recoveryRate) + '%</div><div class="recovery-stat-lbl">Double miss</div></div>' +
+      '</div>'
+    : '<div class="no-data-note">Not enough data</div>';
+  document.getElementById('birdCard').innerHTML =
+    '<div class="bird-compare">' +
+      '<div class="bird-col b1"><div class="bird-col-label">Bird 1</div><div class="bird-col-val">' + fmtPct(st.b1pct) + '</div><div class="bird-col-sub">' + st.b1hit + ' of ' + st.b1total + ' hit</div></div>' +
+      '<div class="bird-col b2"><div class="bird-col-label">Bird 2</div><div class="bird-col-val">' + fmtPct(st.b2pct) + '</div><div class="bird-col-sub">' + st.b2hit + ' of ' + st.b2total + ' hit</div></div>' +
+    '</div>' +
+    '<div class="recovery-row"><div class="recovery-label">When you miss Bird 1...</div>' + recHtml + '</div>';
+
+  // STATION BAR CHART
+  var barRows = '';
+  stations.forEach(function(s) {
+    if (s.hit === null) return;
+    var pct = Math.round((s.hit / s.total) * 100);
+    var dots = '';
+    // Generate hit/miss dots — approximate pattern: hits first
+    var h = s.hit;
+    for (var i = 0; i < s.total; i++) {
+      dots += '<div class="bird-dot ' + (h > 0 ? 'hit' : 'miss') + '"></div>';
+      if (h > 0) h--;
+    }
+    var warn = pct < 50 ? ' ⚠' : '';
+    barRows += '<div class="bar-row">' +
+      '<span class="bar-label">S' + s.station + '</span>' +
+      '<div class="bar-track"><div class="bar-fill ' + barClass(pct) + '" style="width:' + pct + '%"></div></div>' +
+      '<div class="bar-seq">' + dots + '</div>' +
+      '<span class="bar-pct">' + s.hit + '/' + s.total + warn + '</span>' +
+    '</div>';
+  });
+  document.getElementById('stationChart').innerHTML =
+    '<div class="bar-chart">' + barRows + '</div>' +
+    '<div class="bar-legend">' +
+      '<div class="bar-legend-item"><div class="bar-legend-swatch" style="background:var(--success)"></div>≥75%</div>' +
+      '<div class="bar-legend-item"><div class="bar-legend-swatch" style="background:var(--warn)"></div>50–74%</div>' +
+      '<div class="bar-legend-item"><div class="bar-legend-swatch" style="background:var(--clay)"></div>&lt;50%</div>' +
+      '<div class="bar-legend-item"><div class="bird-dot hit"></div>Hit &nbsp;<div class="bird-dot miss"></div>Miss</div>' +
+    '</div>';
+
+  // ROUND STRUCTURE
+  var validPcts = st.stationPcts.filter(function(p) { return p !== null; });
+  var n = validPcts.length;
+  var svgW = 440, svgH = 72;
+  var points = validPcts.map(function(p, i) {
+    var x = n > 1 ? (i / (n - 1)) * svgW : svgW / 2;
+    var y = svgH - (p / 100) * (svgH - 8) - 4;
+    return { x: x, y: y, p: p };
+  });
+  var pathD = points.map(function(pt, i) { return (i === 0 ? 'M' : 'L') + pt.x.toFixed(1) + ',' + pt.y.toFixed(1); }).join(' ');
+  var areaD = pathD + ' L' + svgW + ',' + svgH + ' L0,' + svgH + ' Z';
+  var dotsSvg = points.map(function(pt) {
+    var col = pt.p >= 75 ? '#4A9E6B' : pt.p >= 50 ? '#E2A020' : '#C4531A';
+    return '<circle cx="' + pt.x.toFixed(1) + '" cy="' + pt.y.toFixed(1) + '" r="3" fill="' + col + '"/>';
+  }).join('');
+  var curveLabels = stations.map(function(s) { return '<span class="curve-label">S' + s.station + '</span>'; }).join('');
+
+  document.getElementById('structureCard').innerHTML =
+    '<div class="structure-row">' +
+      '<div class="structure-stat"><div class="structure-val ' + colorClass(st.frontPct) + '">' + fmtPct(st.frontPct) + '</div><div class="structure-lbl">Front Half<br>S1–S' + Math.floor(stations.length/2) + '</div></div>' +
+      '<div class="structure-divider"></div>' +
+      '<div class="structure-stat"><div class="structure-val ' + colorClass(st.backPct) + '">' + fmtPct(st.backPct) + '</div><div class="structure-lbl">Back Half<br>S' + (Math.floor(stations.length/2)+1) + '–S' + stations.length + '</div></div>' +
+      '<div class="structure-divider"></div>' +
+      '<div class="structure-stat"><div class="structure-val ' + colorClass(st.openPct) + '">' + fmtPct(st.openPct) + '</div><div class="structure-lbl">Opening<br>Station S' + startStation + '</div></div>' +
+      '<div class="structure-divider"></div>' +
+      (st.closeStn ? '<div class="structure-stat"><div class="structure-val ' + colorClass(st.closePct) + '">' + fmtPct(st.closePct) + '</div><div class="structure-lbl">Closing<br>Station S' + st.closeStn.station + '</div></div>' : '') +
+    '</div>' +
+    '<div style="font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--fog);margin-bottom:8px;">Hit % across round</div>' +
+    '<div class="curve-wrap"><svg viewBox="0 0 440 72" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C4531A" stop-opacity="0.25"/><stop offset="100%" stop-color="#C4531A" stop-opacity="0"/></linearGradient></defs>' +
+      '<line x1="0" y1="18" x2="440" y2="18" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>' +
+      '<line x1="0" y1="36" x2="440" y2="36" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>' +
+      '<line x1="0" y1="54" x2="440" y2="54" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>' +
+      '<path d="' + areaD + '" fill="url(#cg)"/>' +
+      '<path d="' + pathD + '" fill="none" stroke="#C4531A" stroke-width="2"/>' +
+      dotsSvg +
+    '</svg></div>' +
+    '<div class="curve-labels">' + curveLabels + '</div>';
+
+  // PAIR TYPE TABLE
+  var hasRorT = st.rStats || st.tStats;
+  if (hasRorT) {
+    function fmtStat(v) { return v !== null ? v + '%' : '—'; }
+    var rRow = st.rStats
+      ? '<tr><td><span class="pair-type-badge badge-r">Report</span></td>' +
+        '<td class="' + tableColorClass(st.rStats.overall) + '">' + st.rStats.overall + '%</td>' +
+        '<td class="' + tableColorClass(st.rStats.b1) + '">' + st.rStats.b1 + '%</td>' +
+        '<td class="' + tableColorClass(st.rStats.b2) + '">' + st.rStats.b2 + '%</td>' +
+        '<td class="' + tableColorClass(st.rStats.recovery) + '">' + fmtStat(st.rStats.recovery) + '</td></tr>'
+      : '';
+    var tRow = st.tStats
+      ? '<tr><td><span class="pair-type-badge badge-t">True</span></td>' +
+        '<td class="' + tableColorClass(st.tStats.overall) + '">' + st.tStats.overall + '%</td>' +
+        '<td class="' + tableColorClass(st.tStats.b1) + '">' + st.tStats.b1 + '%</td>' +
+        '<td class="' + tableColorClass(st.tStats.b2) + '">' + st.tStats.b2 + '%</td>' +
+        '<td class="' + tableColorClass(st.tStats.recovery) + '">' + fmtStat(st.tStats.recovery) + '</td></tr>'
+      : '';
+    document.getElementById('pairTableWrap').innerHTML =
+      '<p class="section-label">Report vs True Pairs</p>' +
+      '<div class="card"><table class="pair-table">' +
+        '<thead><tr><th>Type</th><th>Overall</th><th>Bird 1</th><th>Bird 2</th><th>Recovery</th></tr></thead>' +
+        '<tbody>' + rRow + tRow + '</tbody>' +
+      '</table></div>';
+  } else {
+    document.getElementById('pairTableWrap').innerHTML = '';
+  }
+
+  // INSIGHTS
+  var insights = [];
+  // Front/back fade
+  if (st.frontPct !== null && st.backPct !== null && (st.frontPct - st.backPct) > 10) {
+    insights.push({ icon: '📉', text: '<strong>Back half fade.</strong> You hit ' + st.frontPct + '% in the front half and ' + st.backPct + '% in the back — a ' + (st.frontPct - st.backPct) + '-point drop. Fatigue or pressure is costing you birds late in the round.' });
+  }
+  // Opening station
+  if (st.openPct !== null && st.openPct === 100) {
+    insights.push({ icon: '🔥', text: '<strong>Clean opener.</strong> Perfect score on your starting station (S' + startStation + '). Your pre-shot routine is working from the first box.' });
+  } else if (st.openPct !== null && st.openPct < 60) {
+    insights.push({ icon: '⚠️', text: '<strong>Slow start.</strong> You hit only ' + st.openPct + '% on your opening station (S' + startStation + '). Cold-start nerves or an incomplete pre-shot routine may be the cause.' });
+  }
+  // B1 vs B2 gap
+  if (Math.abs(st.b1pct - st.b2pct) > 12) {
+    if (st.b1pct > st.b2pct) {
+      insights.push({ icon: '⚠️', text: '<strong>Second bird vulnerability.</strong> Bird 1 at ' + st.b1pct + '%, Bird 2 at ' + st.b2pct + '% — a ' + (st.b1pct - st.b2pct) + '-point gap. You are losing birds when switching to the second target.' });
+    } else {
+      insights.push({ icon: '✅', text: '<strong>Strong second bird.</strong> You actually hit Bird 2 more reliably (' + st.b2pct + '%) than Bird 1 (' + st.b1pct + '%) — unusual and positive. Your pair sequencing is working.' });
+    }
+  }
+  // Recovery rate
+  if (st.recoveryRate !== null && st.recoveryRate < 50) {
+    insights.push({ icon: '🔁', text: '<strong>Low recovery rate.</strong> When you miss Bird 1, you convert Bird 2 only ' + st.recoveryRate + '% of the time. Missing the first bird is collapsing the pair mentally.' });
+  } else if (st.recoveryRate !== null && st.recoveryRate >= 70) {
+    insights.push({ icon: '💪', text: '<strong>Strong recovery.</strong> You convert Bird 2 ' + st.recoveryRate + '% of the time after missing Bird 1 — that mental reset is a real asset.' });
+  }
+  // R vs T gap
+  if (st.rStats && st.tStats && Math.abs(st.rStats.overall - st.tStats.overall) > 10) {
+    if (st.rStats.overall > st.tStats.overall) {
+      insights.push({ icon: '🎯', text: '<strong>Report pairs are your strength.</strong> ' + st.rStats.overall + '% on report vs ' + st.tStats.overall + '% on true pairs. The timing pressure of true pairs is affecting your performance.' });
+    } else {
+      insights.push({ icon: '🎯', text: '<strong>True pairs suit you.</strong> ' + st.tStats.overall + '% on true pairs vs ' + st.rStats.overall + '% on report — you perform better under time pressure.' });
+    }
+  }
+  // Clean round
+  if (st.pct >= 90) {
+    insights.push({ icon: '🏆', text: '<strong>Exceptional round.</strong> ' + st.pct + '% is elite-level performance. The numbers show a consistent, disciplined shooter.' });
+  }
+  // Fallback
+  if (insights.length === 0) {
+    insights.push({ icon: '📊', text: '<strong>Solid data captured.</strong> Tag more stations as Report or True in the review screen to unlock pair type analysis.' });
+  }
+
+  document.getElementById('insightCard').innerHTML = insights.map(function(ins) {
+    return '<div class="insight-row"><span class="insight-icon">' + ins.icon + '</span><span class="insight-text">' + ins.text + '</span></div>';
+  }).join('');
+}
+
+// ── COACHING ────────────────────────────────────────────────────
+async function getCoaching() {
+  const st = computeStats();
   const format = document.getElementById('format').value;
   const conditions = document.getElementById('conditions').value;
   const mentalVal = mental || 'not reported';
@@ -426,7 +887,7 @@ async function getCoaching() {
     .join(', ');
   const breakdown = stations.map(function(s) { return 'S' + s.station + ':' + (s.hit !== null ? s.hit : '?') + '/' + s.total + (s.pairs ? ' (' + s.pairs + ')' : ''); }).join(' ');
 
-  const btn = document.getElementById('submitBtn');
+  const btn = document.getElementById('coachBtn');
   btn.disabled = true; btn.textContent = 'ANALYZING...';
   document.getElementById('errorMsg').classList.remove('visible');
 
@@ -439,32 +900,33 @@ async function getCoaching() {
         max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: 'You are ClayIQ — an expert sporting clays performance coach with deep technical knowledge. Use the reference knowledge below to give specific, technically grounded coaching. Never give generic advice. Always connect feedback to specific shot types, pair types, and mental patterns.\n\n=== TECHNICAL REFERENCE ===\n\nGUN MOUNT: Shooting eye must align with muzzle on every shot. Four styles: full pre-mount, soft pre-mount (gun in shoulder, head off stock), cheat mount (gun 3–4 inches from face), low unmounted. Cheat mount is default for most crossing, incoming, looping shots. Gun must hit shoulder and face simultaneously — both hands rise together, front hand leads. Never turn head aggressively to find the bird — keep head still, turn eyes first.\n\nVISION: Soft focus = peripheral tracking as bird leaves trap (blurry is correct and intentional). Hard focus = locked on front edge/belly of clay at break point. This is a continuum, not a switch. Hard focus too early ruins the shot. On fast going-away birds, elite shooters often fire with the bird completely out of focus — trust the setup. Visual opportunity varies by target: crossing shots have a long window; fast quartering-away birds have almost none. Match your technique to the window the bird gives you.\n\nLEAD: Lead is always the direction of travel — think clock position (2 o\'clock, 7 o\'clock), never "left and under." Visualize the shell on the nose of the bird pointing where it\'s going.\n\nGUN-BIRD SYNCHRONIZATION: Barrel and bird must move together like merging into traffic. Bird speed is fixed; barrel speed is the variable. Inconsistency is almost always a synchronization problem, not a lead problem.\n\nCROSSING SHOTS: Traditional approach (80–90% of crossers) — connect gun and bird at hold point, run with the target, let the gun stretch ahead at the end. Insert on front edge at close range; further ahead as distance/speed increase. Insert-to-lead approach — gun goes from hold point directly to break point, fires on mount, used for limited-window fast crossers. Requires experience.\n\nGOING-AWAY/TRAP BIRDS: Soft pre-mount — gun in shoulder, head OFF stock to see under/around the barrel. Pick up bird as flash or motion below gun. Never fully mounted with head down on steep rising birds.\n\nTEAL/APEX SHOTS: Insert to bottom edge at 80–90% of climb. Fire AS the bird stops (feel it decelerate), not WHEN you see it stop — at distance, seeing it stop means you\'re already late. Watch for left/right fade at distance.\n\nDROPPERS: Shoot on the way down. Read the clock direction of the drop (6–8 o\'clock). Insert on that line, not straight down. Settling droppers (cup up): connect close, stretch away. Fast-falling droppers: insert further under, less movement. Use unmounted gun — don\'t track from apex while fully mounted.\n\nIN-BETWEEN ANGLES: Part going-away, part crosser. Decision: mounted vs. cheat mount depends on how much time you have. These birds often fly to 2 or 10 o\'clock — fail to see around the barrel and you shoot under every time.\n\nMENTAL GAME PRE-SHOT: 4 steps — (1) View birds: read angle/speed/distance, know what detail you\'ll look at (front edge, belly, rim). (2) Form the plan: break point, hold point, visual pickup zone, pair sequencing. (3) Confirm 100%: undecided shooters cannot transition to subconscious. Commit fully — better to be committed and wrong than uncertain. (4) Rehearse: use your hand as the gun, show yourself what\'s about to happen while watching other shooters.\n\nBOX ROUTINE: Must be identical every shot. Loading, stance, call — all pre-decided. The one non-negotiable: something directing attention to watching the clay ("see the front edge, see the belly"). Call pull slightly early rather than late.\n\nMENTAL FAILURE PATTERN: When doubt arrives, the conscious mind re-engages and you see the PROCESS (barrel, lead, gun movement) instead of the TARGET. Result: visual failure — hands slow, you measure instead of feel, you shoot behind. Fix: self-talk directed back at the clay: "See the front edge. Watch the clay." This occupies the conscious mind with something useful.\n\nCOMMON FAULT PATTERNS:\n- Missed going-away: pre-mounted with head down, can\'t see around barrel → soft pre-mount, head off stock\n- Missed crossers (behind): gun not synchronized with bird → connect at hold point and run with it\n- Missed crossers (in front): over-inserted or ran past bird → reduce insert\n- Missed teal: trigger pulled too late → insert to bottom edge earlier, fire on deceleration\n- Missed droppers: failed to read clock line of drop → identify 6–8 o\'clock line and insert on it\n- Inconsistent scores: synchronization problem, not lead knowledge → deliberate practice on merging gun and bird speed\n- Collapse in final stations: score awareness + pressure → self-talk directed at seeing the clay, simplify routine\n- Strong first bird, missed second on true pairs: plan for second bird not confirmed → plan both birds before stepping in\n\nREPORT PAIRS: Time to re-confirm plan between birds.\nTRUE PAIRS: Pair sequencing is critical — sometimes take a risk on bird one to get a clean shot at bird two. Know which bird you\'re prioritizing before stepping in.\n\n=== END REFERENCE ===\n\nRound data:\n- Score: ' + totalHit + '/' + totalBirds + ' (' + pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n\nUsing the technical reference above, respond with exactly three sections using bold headers:\n\n**Round Read** — One honest sentence. Reference the specific pattern you see in their data. Direct, not sugarcoated.\n\n**Focus For Next Session** — The single highest-leverage fix. Name the specific fault (e.g. synchronization, visual failure, mount style), explain why it applies to their weak stations and pair types, and give one concrete drill.\n\n**Mental Cue** — One specific cue for their next round based on their mental game state. Reference the pre-shot system, box routine, or recovery protocol as appropriate.\n\nSound like a coach who has seen everything. Be specific. Not a chatbot.'
+          content: 'You are ClayIQ — an expert sporting clays performance coach with deep technical knowledge. Use the reference knowledge below to give specific, technically grounded coaching. Never give generic advice. Always connect feedback to specific shot types, pair types, and mental patterns.\n\n=== TECHNICAL REFERENCE ===\n\nGUN MOUNT: Shooting eye must align with muzzle on every shot. Four styles: full pre-mount, soft pre-mount (gun in shoulder, head off stock), cheat mount (gun 3–4 inches from face), low unmounted. Cheat mount is default for most crossing, incoming, looping shots. Gun must hit shoulder and face simultaneously — both hands rise together, front hand leads. Never turn head aggressively to find the bird — keep head still, turn eyes first.\n\nVISION: Soft focus = peripheral tracking as bird leaves trap (blurry is correct and intentional). Hard focus = locked on front edge/belly of clay at break point. This is a continuum, not a switch. Hard focus too early ruins the shot. On fast going-away birds, elite shooters often fire with the bird completely out of focus — trust the setup. Visual opportunity varies by target: crossing shots have a long window; fast quartering-away birds have almost none. Match your technique to the window the bird gives you.\n\nLEAD: Lead is always the direction of travel — think clock position (2 o\'clock, 7 o\'clock), never "left and under." Visualize the shell on the nose of the bird pointing where it\'s going.\n\nGUN-BIRD SYNCHRONIZATION: Barrel and bird must move together like merging into traffic. Bird speed is fixed; barrel speed is the variable. Inconsistency is almost always a synchronization problem, not a lead problem.\n\nCROSSING SHOTS: Traditional approach (80–90% of crossers) — connect gun and bird at hold point, run with the target, let the gun stretch ahead at the end. Insert on front edge at close range; further ahead as distance/speed increase. Insert-to-lead approach — gun goes from hold point directly to break point, fires on mount, used for limited-window fast crossers. Requires experience.\n\nGOING-AWAY/TRAP BIRDS: Soft pre-mount — gun in shoulder, head OFF stock to see under/around the barrel. Pick up bird as flash or motion below gun. Never fully mounted with head down on steep rising birds.\n\nTEAL/APEX SHOTS: Insert to bottom edge at 80–90% of climb. Fire AS the bird stops (feel it decelerate), not WHEN you see it stop — at distance, seeing it stop means you\'re already late. Watch for left/right fade at distance.\n\nDROPPERS: Shoot on the way down. Read the clock direction of the drop (6–8 o\'clock). Insert on that line, not straight down. Settling droppers (cup up): connect close, stretch away. Fast-falling droppers: insert further under, less movement. Use unmounted gun — don\'t track from apex while fully mounted.\n\nIN-BETWEEN ANGLES: Part going-away, part crosser. Decision: mounted vs. cheat mount depends on how much time you have. These birds often fly to 2 or 10 o\'clock — fail to see around the barrel and you shoot under every time.\n\nMENTAL GAME PRE-SHOT: 4 steps — (1) View birds: read angle/speed/distance, know what detail you\'ll look at (front edge, belly, rim). (2) Form the plan: break point, hold point, visual pickup zone, pair sequencing. (3) Confirm 100%: undecided shooters cannot transition to subconscious. Commit fully — better to be committed and wrong than uncertain. (4) Rehearse: use your hand as the gun, show yourself what\'s about to happen while watching other shooters.\n\nBOX ROUTINE: Must be identical every shot. Loading, stance, call — all pre-decided. The one non-negotiable: something directing attention to watching the clay ("see the front edge, see the belly"). Call pull slightly early rather than late.\n\nMENTAL FAILURE PATTERN: When doubt arrives, the conscious mind re-engages and you see the PROCESS (barrel, lead, gun movement) instead of the TARGET. Result: visual failure — hands slow, you measure instead of feel, you shoot behind. Fix: self-talk directed back at the clay: "See the front edge. Watch the clay." This occupies the conscious mind with something useful.\n\nCOMMON FAULT PATTERNS:\n- Missed going-away: pre-mounted with head down, can\'t see around barrel → soft pre-mount, head off stock\n- Missed crossers (behind): gun not synchronized with bird → connect at hold point and run with it\n- Missed crossers (in front): over-inserted or ran past bird → reduce insert\n- Missed teal: trigger pulled too late → insert to bottom edge earlier, fire on deceleration\n- Missed droppers: failed to read clock line of drop → identify 6–8 o\'clock line and insert on it\n- Inconsistent scores: synchronization problem, not lead knowledge → deliberate practice on merging gun and bird speed\n- Collapse in final stations: score awareness + pressure → self-talk directed at seeing the clay, simplify routine\n- Strong first bird, missed second on true pairs: plan for second bird not confirmed → plan both birds before stepping in\n\nREPORT PAIRS: Time to re-confirm plan between birds.\nTRUE PAIRS: Pair sequencing is critical — sometimes take a risk on bird one to get a clean shot at bird two. Know which bird you\'re prioritizing before stepping in.\n\n=== END REFERENCE ===\n\nRound data:\n- Score: ' + st.totalHit + '/' + st.totalBirds + ' (' + st.pct + '%)\n- Format: ' + format.replace(/_/g, ' ') + '\n- Conditions: ' + conditions + '\n- Mental game: ' + mentalVal.replace(/_/g, ' ') + '\n- Starting station: ' + startStation + '\n- Station breakdown: ' + breakdown + '\n- Weak stations: ' + (weak || 'none — clean round') + '\n- Bird 1 hit rate: ' + st.b1pct + '% | Bird 2 hit rate: ' + st.b2pct + '%\n- Pair completion: ' + st.pairCompletePct + '% | Double miss: ' + st.doubleMissPct + '%\n- Recovery rate (Bird 2 after missing Bird 1): ' + (st.recoveryRate !== null ? st.recoveryRate + '%' : 'insufficient data') + '\n- Front half: ' + (st.frontPct !== null ? st.frontPct + '%' : '?') + ' | Back half: ' + (st.backPct !== null ? st.backPct + '%' : '?') + '\n' + (st.rStats ? '- Report pair hit rate: ' + st.rStats.overall + '% (B1: ' + st.rStats.b1 + '%, B2: ' + st.rStats.b2 + '%, recovery: ' + (st.rStats.recovery !== null ? st.rStats.recovery + '%' : '?') + ')\n' : '') + (st.tStats ? '- True pair hit rate: ' + st.tStats.overall + '% (B1: ' + st.tStats.b1 + '%, B2: ' + st.tStats.b2 + '%, recovery: ' + (st.tStats.recovery !== null ? st.tStats.recovery + '%' : '?') + ')\n' : '') + '\nUsing the technical reference above, respond with exactly three sections using bold headers:\n\n**Round Read** — One honest sentence. Reference the specific pattern you see in their data. Direct, not sugarcoated.\n\n**Focus For Next Session** — The single highest-leverage fix. Name the specific fault (e.g. synchronization, visual failure, mount style), explain why it applies to their weak stations and pair types, and give one concrete drill.\n\n**Mental Cue** — One specific cue for their next round based on their mental game state. Reference the pre-shot system, box routine, or recovery protocol as appropriate.\n\nSound like a coach who has seen everything. Be specific. Not a chatbot.'
         }]
       })
     });
     const data = await res.json();
     let text = data.content[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     document.getElementById('chips').innerHTML =
-      '<span class="chip chip-score">' + totalHit + '/' + totalBirds + ' · ' + pct + '%</span>' +
+      '<span class="chip chip-score">' + st.totalHit + '/' + st.totalBirds + ' · ' + st.pct + '%</span>' +
       '<span class="chip chip-weak">' + stations.filter(function(s) { return s.hit !== null && (s.total - s.hit) > 1; }).length + ' weak stations</span>' +
       '<span class="chip chip-mental">' + mentalVal.replace(/_/g, ' ') + '</span>';
     document.getElementById('coachSub').textContent = format.replace(/_/g, ' ') + ' · ' + conditions + ' · started S' + startStation;
     document.getElementById('coachBody').innerHTML = text;
-    goTo(4);
+    goTo(5);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch(err) {
     const e = document.getElementById('errorMsg');
     e.textContent = 'Coaching engine unavailable. Try again in a moment.';
     e.classList.add('visible');
-    btn.disabled = false; btn.textContent = 'GET MY COACHING';
+    btn.disabled = false; btn.textContent = 'GET MY COACHING →';
   }
 }
 
+// ── NAVIGATION ──────────────────────────────────────────────────
 function goTo(n) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById('screen' + n).classList.add('active');
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     const c = document.getElementById('s' + i);
     const nm = document.getElementById('sn' + i);
     c.classList.remove('active', 'done');
@@ -479,7 +941,8 @@ function goTo(n) {
 function canNav(n) {
   if (n === 1) return true;
   if (n === 2 || n === 3) return stations.length > 0;
-  if (n === 4) return document.getElementById('coachBody').innerHTML.length > 0;
+  if (n === 4) return stations.length > 0;
+  if (n === 5) return document.getElementById('coachBody').innerHTML.length > 0;
   return false;
 }
 
@@ -487,17 +950,15 @@ function resetApp() {
   stations = []; mental = null; imgSrc = ''; startStation = 1;
   document.getElementById('fileInput').value = '';
   document.querySelectorAll('.mental-btn').forEach(function(b) { b.classList.remove('selected'); });
-  document.getElementById('submitBtn').disabled = false;
-  document.getElementById('submitBtn').textContent = 'GET MY COACHING';
+  document.getElementById('coachBtn').disabled = false;
+  document.getElementById('coachBtn').textContent = 'Get my coaching →';
   goTo(1);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // File input covers the upload zone natively — no click triggering needed
 document.getElementById('fileInput').addEventListener('change', function() {
-  if (this.files && this.files[0]) {
-    handleFile(this.files[0]);
-  }
+  if (this.files && this.files[0]) { handleFile(this.files[0]); }
 });
 </script>
 </body>
