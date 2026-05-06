@@ -1,7 +1,7 @@
 <!--
   ClayIQ
-  Version: 1.7.0
-  Updated: 2026-05-03
+  Version: 1.7.1
+  Updated: 2026-05-05
 
   Changelog:
   v1.0.0 - Initial build: score slider, station selection, mental game, AI coaching
@@ -33,6 +33,10 @@
            Stats: bird 1/2 hit %, pair completion, double miss, recovery rate,
            front/back half split, station bar chart with bird sequence dots,
            report vs true pair table, round structure curve, key insights
+  v1.7.1 - Strengthened scorecard reading prompt: removed implicit 5-bird default,
+           added explicit instruction to read grayed/slashed unused slots, enforced
+           valid total range of 4–8 per station, varied example JSON to show mixed totals
+         - Made station total editable in Review screen so users can correct misreads
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -280,7 +284,7 @@ select:focus{border-color:var(--clay);}
       </div>
       <div class="station-tag-list" id="stationList"></div>
     </div>
-    <div class="info-note" style="margin-top:-8px;">Tap a score to edit if AI misread it. &nbsp;<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--clay);vertical-align:middle;margin-right:3px;"></span> = dropped more than 1 bird. If T or R was written on your card it is pre-selected.</div>
+    <div class="info-note" style="margin-top:-8px;">Tap a score or target count to edit if AI misread it. &nbsp;<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--clay);vertical-align:middle;margin-right:3px;"></span> = dropped more than 1 bird. If T or R was written on your card it is pre-selected.</div>
 
     <div class="divider"></div>
     <p class="section-label">Round Details</p>
@@ -448,7 +452,7 @@ async function readCard(src) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
-            { type: 'text', text: 'You are a JSON data extractor. Output ONLY a valid JSON object. No words, no explanation, no markdown, no preamble. Just the JSON.\n\nThis is a sporting clays scorecard image. Extract every station score. Also look for T or R written next to each station.\n\nRequired output format:\n{"stations":[{"station":1,"hit":4,"total":5,"pairs":"true"},{"station":2,"hit":3,"total":5,"pairs":"report"},{"station":3,"hit":4,"total":5,"pairs":null}],"total_hit":75,"total_birds":100}\n\nRules:\n- pairs = "true" if T or True is written next to that station\n- pairs = "report" if R or Report is written next to that station\n- pairs = null if no notation visible\n- Use null for any score you cannot read clearly\n- If image is not a scorecard: {"error":"not a scorecard"}\n\nREMEMBER: Output the JSON object only. First character must be {. Last character must be }.' }
+            { type: 'text', text: 'You are a JSON data extractor. Output ONLY a valid JSON object. No words, no explanation, no markdown, no preamble. Just the JSON.\n\nThis is a sporting clays scorecard image. Extract every station score. Also look for T or R written next to each station.\n\nRequired output format (note: stations have DIFFERENT totals — 4, 6, and 8 are all valid):\n{"stations":[{"station":1,"hit":4,"total":6,"pairs":"true"},{"station":2,"hit":3,"total":4,"pairs":"report"},{"station":3,"hit":7,"total":8,"pairs":null}],"total_hit":75,"total_birds":100}\n\nCRITICAL RULES FOR COUNTING TARGETS (total per station):\n- Each station has between 4 and 8 targets. Valid values: 4, 5, 6, 7, or 8. NEVER assume 5.\n- Count ONLY the active scoring boxes on each station row. Do NOT count boxes that are grayed out, filled with diagonal lines/hatching, crossed out, or otherwise visually disabled — these indicate unused slots and must be excluded from the total.\n- Look carefully at each station row independently. Totals WILL vary across stations.\n- If you cannot determine the total for a station with confidence, use null.\n\nOTHER RULES:\n- pairs = "true" if T or True is written next to that station\n- pairs = "report" if R or Report is written next to that station\n- pairs = null if no notation visible\n- Use null for any score you cannot read clearly\n- If image is not a scorecard: {"error":"not a scorecard"}\n\nREMEMBER: Output the JSON object only. First character must be {. Last character must be }.' }
           ]
         }]
       })
@@ -461,7 +465,7 @@ async function readCard(src) {
     const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
     if (parsed.error) throw new Error(parsed.error);
     stations = parsed.stations.map(function(s) {
-      return { station: s.station, hit: s.hit, total: s.total || 5, pairs: s.pairs || null };
+      return { station: s.station, hit: s.hit, total: s.total || null, pairs: s.pairs || null };
     });
     buildList();
     buildStartStations();
@@ -474,7 +478,7 @@ async function readCard(src) {
     debugEl.classList.add('visible');
     setTimeout(function() {
       stations = Array.from({length: 10}, function(_, i) {
-        return { station: i + 1, hit: null, total: 5, pairs: null };
+        return { station: i + 1, hit: null, total: null, pairs: null };
       });
       buildList();
       buildStartStations();
@@ -498,8 +502,9 @@ function buildList() {
     row.id = 'row' + i;
     row.innerHTML =
       '<span class="stn-num">S' + s.station + '</span>' +
-      '<input class="stn-score-input" type="number" min="0" max="' + s.total + '" value="' + (s.hit !== null ? s.hit : '') + '" placeholder="—" oninput="editScore(' + i + ',this.value)">' +
-      '<span class="stn-birds" id="b' + i + '">' + (s.hit !== null ? s.hit + '/' + s.total : '?/' + s.total) + '</span>' +
+      '<input class="stn-score-input" type="number" min="0" max="' + (s.total || 8) + '" value="' + (s.hit !== null ? s.hit : '') + '" placeholder="—" oninput="editScore(' + i + ',this.value)">' +
+      '<span style="color:var(--fog);font-size:13px;flex-shrink:0;">/</span>' +
+      '<input class="stn-score-input" type="number" min="4" max="8" value="' + (s.total !== null ? s.total : '') + '" placeholder="?" style="width:32px;" oninput="editTotal(' + i + ',this.value)">' +
       '<div class="pairs-toggle">' +
         '<button class="pairs-btn' + rCls + '" onclick="setPairs(' + i + ',\'report\',this)">R</button>' +
         '<button class="pairs-btn' + tCls + '" onclick="setPairs(' + i + ',\'true\',this)">T</button>' +
@@ -526,14 +531,24 @@ function buildStartStations() {
 function editScore(i, val) {
   const n = parseInt(val);
   stations[i].hit = isNaN(n) ? null : n;
-  const weak = stations[i].hit !== null && (stations[i].total - stations[i].hit) > 1;
+  const weak = stations[i].hit !== null && stations[i].total !== null && (stations[i].total - stations[i].hit) > 1;
   document.getElementById('w' + i).classList.toggle('on', weak);
-  document.getElementById('b' + i).textContent = stations[i].hit !== null ? stations[i].hit + '/' + stations[i].total : '?/' + stations[i].total;
+  updateTotal();
+}
+
+function editTotal(i, val) {
+  const n = parseInt(val);
+  stations[i].total = isNaN(n) ? null : Math.min(8, Math.max(4, n));
+  const weak = stations[i].hit !== null && stations[i].total !== null && (stations[i].total - stations[i].hit) > 1;
+  document.getElementById('w' + i).classList.toggle('on', weak);
   updateTotal();
 }
 
 function updateTotal() {
-  document.getElementById('totalDisplay').textContent = stations.reduce(function(s, d) { return s + (d.hit || 0); }, 0);
+  const hit = stations.reduce(function(s, d) { return s + (d.hit || 0); }, 0);
+  const total = stations.reduce(function(s, d) { return s + (d.total || 0); }, 0);
+  document.getElementById('totalDisplay').textContent = hit;
+  document.querySelector('.total-label').textContent = 'Total birds hit' + (total > 0 ? ' of ' + total : '');
 }
 
 function setPairs(i, type, btn) {
